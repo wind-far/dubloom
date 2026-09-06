@@ -1,488 +1,291 @@
-<p align="center">
-  <strong>Dubloom Studio</strong><br />
-  <em>Craft every line. Localize every story.</em>
-</p>
-
 # Dubloom Studio
 
-<p align="center">
-  <strong>A local dubbing review workspace for creators</strong>
-</p>
+A local video localization and dubbing review workspace for individual creators and small teams. Import a video, translate its subtitles, audition and edit each line, then render the voiceover and final video.
 
-Dubloom Studio is a local video dubbing and localization workspace for individual creators and small teams.
+[简体中文](README.md) · **English**
 
-It turns a YouTube, Bilibili, or local video into a target-language version: import, transcribe, and translate the source; refine text, timing, speaker, and voice settings line by line; then produce hard subtitles with the original audio, dubbing without hard subtitles, or both together. Dubbing modes also separate vocals and background audio, generate voiceover, and mix the result into a final video that can be played or downloaded from the web UI.
+[Quick start](#quick-start) · [Usage](#usage) · [Configuration](#configuration) · [Report an issue](https://github.com/wind-far/dubloom/issues)
 
-The upstream project's most mature path is **YouTube English -> Chinese dubbing**. Dubloom Studio keeps that path and also supports **Bilibili Chinese -> English dubbing** and **local-video Japanese -> Chinese dubbing** in the same task pipeline. The Japanese path has automated parameter-flow and regression coverage, but has not yet completed model-quality acceptance with real Japanese media.
+> [!NOTE]
+> This project is an MVP. It accepts YouTube, Bilibili, and local videos, and pauses for human review after translation by default. Japanese-to-Chinese has automated parameter-flow and regression coverage; model-quality acceptance with real Japanese media is still pending.
+>
+> Videos, databases, and generated files stay on your computer. Translation text is sent to your configured OpenAI-compatible API. Downloading videos, models, and dependencies also requires network access.
 
-> **Origin and independence:** Dubloom Studio is an independent derivative of [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui). It is not an official release by, or endorsed by, the YouDub-webui author. The upstream project was created by [Zhao Liu](https://liuzhao1225.github.io/en/) (GitHub [@liuzhao1225](https://github.com/liuzhao1225), Bilibili [黑纹白斑马](https://space.bilibili.com/1263732318)). Existing `YOUDUB_*` environment variables, selected filenames, and API paths remain unchanged for deployment compatibility.
+<a id="overview"></a>
 
-中文 README: [README.md](README.md)
+## What is Dubloom?
 
-## Upstream-Proven Creator Workflow
+Dubloom organizes video localization into tasks you can inspect and revise. Review the translated wording, timing, and audio mode for each segment, then approve the task to continue rendering. Editing a completed task marks its output as stale; you can regenerate the affected segments and update the final video.
 
-**Author's Bilibili channel**: [黑纹白斑马](https://space.bilibili.com/1263732318) — 1M+ followers, 20K+ videos, and 680M+ total views. The whole channel is translated and dubbed with YouDub WebUI, covering technology, games, science, animals, history, and more.
+The light workspace includes a task list, stage progress, source video preview, subtitle editor, and segment inspector. A SQLite database and a single-threaded FIFO worker support serial processing on a local machine.
 
-This case demonstrates the video-processing foundation proven by upstream YouDub-webui; it does not imply that the upstream author participated in or endorsed Dubloom Studio. Dubloom adds post-translation review, per-line auditioning, and partial regeneration on top of that local pipeline.
+<a id="capabilities"></a>
 
-## Demo
+## Five core capabilities
 
-The samples below come from upstream YouDub-webui and can be played directly on GitHub. The left side is the original video, and the right side is the automatically dubbed version. The dubbed videos include target-language voiceover and subtitles while preserving the original background music and sound effects.
+| Capability | Everyday use | Implementation |
+| --- | --- | --- |
+| Video import | Submit YouTube / Bilibili URLs, or upload a local video with an optional translated SRT. | [Input adapters](backend/app/adapters/) |
+| Automated processing | Separate vocals, transcribe speech, organize sentences, and translate through an API. | [Pipeline](backend/app/pipeline.py) |
+| Line-by-line review | Edit translation, timing, speaker, and audio mode; audition source vocals and TTS previews. | [Review workspace](apps/web/src/app/tasks/%5Bid%5D/review/page.tsx) |
+| Partial regeneration | Reuse unchanged TTS files, regenerate edited segments, then remix and render the video. | [Review and rendering](backend/app/review.py) |
+| Tasks and model configuration | Inspect logs, resume failed stages, select translation / TTS profiles, and retain task parameter snapshots. | [Worker](backend/app/worker.py) · [Providers](backend/app/providers/) |
 
-### 1. Jensen Huang on Nvidia's Competition
+The default providers are OpenAI-compatible translation and local VoxCPM2. Profiles can be managed through `/api/provider-profiles` and selected when creating a task; a full profile-management UI is not yet available.
 
-[YouTube source](https://www.youtube.com/shorts/TbotsRXyRME) · YouTube Shorts · English -> Chinese
+<a id="formats"></a>
 
-<table>
-<tr><th>Original English</th><th>Chinese dubbed</th></tr>
-<tr>
-<td>
+## Supported inputs and outputs
 
-https://github.com/user-attachments/assets/befd11ca-e720-4faa-b4e0-d89bfe73df87
+| Input | Translation direction | Optional subtitles |
+| --- | --- | --- |
+| YouTube URL | English → Chinese | Not supported |
+| Bilibili URL | Chinese → English | Not supported |
+| Local video | English → Chinese, Japanese → Chinese, Chinese → English | Translated `.srt` |
 
-</td>
-<td>
+A local SRT must use the target language of the selected direction. Providing one skips speech recognition and API translation, then continues through review and output. Default upload limits are 4 GiB for video and 20 MiB for subtitles; both are configurable.
 
-https://github.com/user-attachments/assets/bf01f912-eec8-4e0d-8698-0f69283a73e7
+| Output mode | Audio | On-screen subtitles |
+| --- | --- | --- |
+| `subtitles` | Original audio track | Burned-in target-language subtitles |
+| `dubbing` | Target-language voiceover with background audio | No additional subtitles burned in |
+| `both` | Target-language voiceover with background audio | Burned-in target-language subtitles |
 
-</td>
-</tr>
-</table>
+The current scope is individual video tasks. It does not include a full multitrack timeline, lip synchronization, or multi-user collaboration.
 
-### 2. How much YT paid me for 129 million shorts views
+<a id="requirements"></a>
 
-[YouTube source](https://www.youtube.com/watch?v=ii9Kh4XkA5g) · Long-form landscape video · English -> Chinese · The embedded clip shows the first 40 seconds; the full version is available in the [`demo-assets`](https://github.com/liuzhao1225/YouDub-webui/releases/tag/demo-assets) Release
+## Requirements
 
-<table>
-<tr><th>Original English</th><th>Chinese dubbed</th></tr>
-<tr>
-<td>
+| Component | Requirement |
+| --- | --- |
+| Python | 3.12 in a dedicated virtual environment. |
+| Node.js | Recommended: 22.x starting at 22.13, or 24.x, with npm. Frontend test dependencies also impose Node version requirements. |
+| FFmpeg / ffprobe | Available on `PATH` or configured with absolute paths. Hard subtitles require the `subtitles` filter / libass. |
+| Inference device | An NVIDIA CUDA GPU is recommended for full processing; CPU mode is slow. Whisper falls back to CPU when MPS is selected. |
+| Translation service | An OpenAI-compatible Chat Completions API URL, key, and model name. A translated SRT can bypass this step. |
+| Storage and network | Allow space for model caches, source videos, and intermediate audio. Configure connectivity, proxies, and cookies for the video source as needed. |
 
-https://github.com/user-attachments/assets/bd02936f-cf3c-4e4b-85b5-0410d38f69f5
+Initial model downloads and full video processing can take substantial time. The VoxCPM library selects its own device, shown in task logs as `voxcpm=library-auto`.
 
-</td>
-<td>
+<a id="quick-start"></a>
 
-https://github.com/user-attachments/assets/158de60a-7de4-4ddf-b3d8-478d0423aee6
+## Quick start
 
-</td>
-</tr>
-</table>
+### 1. Get the source
 
-## Quick Start
-
-### 1. Prepare the runtime
-
-Verified and recommended runtime:
-
-- **Windows 10/11 + PowerShell 5.1+**: recommended for local development and covered first in this README.
-- **Linux / WSL2 / macOS**: backend and frontend commands are provided for POSIX shells. CUDA, FFmpeg, PyTorch, and audio dependencies still need to match your platform.
-- **CUDA GPU**: recommended for complete video processing. `DEVICE=cpu` can be used for some flows, but transcription, separation, and TTS will be very slow; with `DEVICE=mps`, Whisper automatically falls back to CPU to avoid the MPS float64 limitation.
-
-Base dependencies:
-
-- Python 3.12.
-- Node.js 20+.
-- FFmpeg / ffprobe available on `PATH`.
-- A working YouTube proxy when processing YouTube videos.
-- Netscape-format YouTube cookies, recommended for YouTube videos.
-- An OpenAI-compatible Chat Completions base URL, API key, and model name.
-
-The first run may download or load large ASR, TTS, and audio-processing models. Leave enough disk space and time for that setup.
-
-Platform notes:
-
-- Windows PowerShell uses `.venv\Scripts\...`; do not copy `.venv/bin/...` commands there.
-- macOS/Linux use `.venv/bin/...`.
-- If multiple Python installs exist, check `py -0p` on Windows or `python3.12 --version` on macOS/Linux first.
-- Proxy settings, cookies, model cache, and work folders stay local. Quote paths that contain spaces, or put them in `.env`.
-
-Common system dependency examples:
-
-```powershell
-# Windows PowerShell (choose a package manager already available on your machine)
-winget install Gyan.FFmpeg.Shared
-winget install OpenJS.NodeJS.LTS
-```
-
-Windows requires a shared/full-shared FFmpeg build. Run the following checks from that build's `bin` directory. The `av*.dll` command should list at least `avcodec-*.dll`, `avformat-*.dll`, and `avutil-*.dll`. A directory containing only `ffmpeg.exe`, `ffplay.exe`, and `ffprobe.exe` is a static build and cannot provide TorchCodec's runtime libraries.
-
-```powershell
-$ffmpegBin = "C:\path\to\ffmpeg\bin"
-Get-ChildItem "$ffmpegBin\av*.dll"
-& "$ffmpegBin\ffmpeg.exe" -version
-& "$ffmpegBin\ffprobe.exe" -version
-```
-
-Keep the verified `bin` directory handy and add its actual path after creating `.env` in step 4. Python 3.8+ requires applications to register DLL search directories explicitly; changing `PATH` alone does not guarantee that TorchCodec can find these DLLs. At startup, Dubloom reads `FFMPEG_PATH`, checks for `av*.dll` in the same directory, and registers it with `os.add_dll_directory()`. Configuration errors are reported immediately during startup.
+This repository is currently private. Use a GitHub account with access before cloning.
 
 ```bash
-# Ubuntu / Debian / WSL2
-sudo apt update
-sudo apt install -y ffmpeg nodejs npm
+git clone --recurse-submodules https://github.com/wind-far/dubloom.git
+cd dubloom
 ```
 
-```bash
-# macOS (Homebrew)
-brew install ffmpeg node
-```
+For an existing checkout, run `git submodule update --init --recursive` to initialize Demucs.
 
-If your system package manager does not provide Python 3.12, install it from python.org, pyenv, conda/mamba, or your distro's recommended channel. The important part is to create the virtual environment with Python 3.12.
+### 2. Install dependencies
 
-### 2. Get the project
+Install Python, Node.js, and FFmpeg according to the requirements above. For NVIDIA CUDA, install a PyTorch build compatible with your driver inside the virtual environment before the project dependencies. The repository includes a [CUDA 12.8 requirements file](requirements-pytorch-cu128.txt).
 
-Copy the actual repository URL from the current Dubloom Studio repository page, then run the same commands on Windows PowerShell, macOS, or Linux:
-
-```powershell
-git clone CURRENT-DUBLOOM-REPOSITORY-URL Dubloom
-cd Dubloom
-git submodule update --init --recursive
-```
-
-Demucs is included as a source submodule, so do not skip `git submodule update`. To inspect the original implementation or synchronize upstream changes, use the [YouDub-webui upstream repository](https://github.com/liuzhao1225/YouDub-webui); that URL is not a Dubloom Studio release.
-
-### 3. Install dependencies
-
-#### Windows PowerShell
-
-Python:
-
-```powershell
-py -3.12 -m venv .venv
-.\.venv\Scripts\python.exe -m pip install -U pip
-.\.venv\Scripts\pip.exe install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
-```
-
-Frontend:
-
-```powershell
-Push-Location apps/web
-npm ci --registry=https://registry.npmmirror.com
-Pop-Location
-```
-
-#### macOS / Linux / WSL2
-
-Python:
+<details open>
+<summary>macOS / Linux / WSL2</summary>
 
 ```bash
 python3.12 -m venv .venv
 .venv/bin/python -m pip install -U pip
-.venv/bin/pip install -i https://mirrors.aliyun.com/pypi/simple/ -r requirements.txt
-```
-
-Frontend:
-
-```bash
-(cd apps/web && npm ci --registry=https://registry.npmmirror.com)
-```
-
-Use Aliyun first. If a specific Python package is temporarily unavailable there, retry only that package with the Tsinghua mirror instead of mixing multiple mirrors in one resolver command.
-
-#### Optional: NVIDIA CUDA GPU
-
-If you want Whisper, Demucs, or VoxCPM to use an NVIDIA GPU, install the CUDA-enabled PyTorch wheels before installing `requirements.txt`:
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\pip.exe install -r requirements-pytorch-cu128.txt
-```
-
-Linux / WSL2:
-
-```bash
-.venv/bin/pip install -r requirements-pytorch-cu128.txt
-```
-
-`requirements-pytorch-cu128.txt` uses PyTorch's `cu128` wheel index by default. Different NVIDIA driver or CUDA environments may need a different PyTorch CUDA build, so use the [official PyTorch installation page](https://pytorch.org/get-started/locally/) when you need a matching command. CPU users and macOS users do not need this step; set `DEVICE=cpu` in `.env` when CUDA-enabled PyTorch is not installed.
-
-Verify that CUDA is actually available after installation:
-
-```bash
-.venv/bin/python -c "import torch; print(torch.__version__, torch.version.cuda, torch.cuda.is_available())"
-```
-
-### 4. Configure
-
-Windows PowerShell:
-
-```powershell
-Copy-Item env.txt.example .env
-```
-
-macOS / Linux / WSL2:
-
-```bash
+# Optional, NVIDIA CUDA environments only:
+# .venv/bin/python -m pip install -r requirements-pytorch-cu128.txt
+.venv/bin/python -m pip install -r requirements.txt
+npm --prefix apps/web ci
 cp env.txt.example .env
 ```
 
-The application reads `.env` at runtime. Do not commit API keys, cookies, downloaded media, or generated artifacts.
+</details>
 
-On Windows, add the shared/full-shared FFmpeg paths verified in step 1 to the `.env` file you just created:
-
-```dotenv
-FFMPEG_PATH=C:/path/to/ffmpeg/bin/ffmpeg.exe
-FFPROBE_PATH=C:/path/to/ffmpeg/bin/ffprobe.exe
-```
-
-Authentication is mandatory by default, and the backend refuses to start without `YOUDUB_AUTH_PASSWORD_HASH`. Generate an Argon2id hash locally with an interactive password prompt; these commands do not put the plaintext password in shell history.
-
-Windows PowerShell:
+<details>
+<summary>Windows PowerShell</summary>
 
 ```powershell
-.\.venv\Scripts\python.exe -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('Dubloom password: ')))"
+py -3.12 -m venv .venv
+.\.venv\Scripts\python.exe -m pip install -U pip
+# Optional, NVIDIA CUDA environments only:
+# .\.venv\Scripts\python.exe -m pip install -r requirements-pytorch-cu128.txt
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+npm --prefix apps/web ci
+Copy-Item env.txt.example .env
 ```
 
-macOS / Linux / WSL2:
+TorchCodec on Windows requires a shared/full-shared FFmpeg build. Set `FFMPEG_PATH` to its `ffmpeg.exe`; the same directory must contain DLLs such as `avcodec-*.dll`, `avformat-*.dll`, and `avutil-*.dll`. A static build containing only executables does not meet this requirement.
+
+</details>
+
+Frontend installation uses the npm mirror configured in the repository. To use the official registry, run `npm --prefix apps/web ci --registry=https://registry.npmjs.org`.
+
+### 3. Configure login and runtime settings
+
+The backend requires an Argon2id password hash. Run this command and enter your access password interactively:
 
 ```bash
 .venv/bin/python -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('Dubloom password: ')))"
 ```
 
-Copy the complete hash into `YOUDUB_AUTH_PASSWORD_HASH` in `.env`. Never put the plaintext password there, and never commit a real hash to Git.
+On Windows, replace `.venv/bin/python` with `.\.venv\Scripts\python.exe`.
 
-Common environment variables:
+Paste the complete hash into `.env`, then configure the device and translation settings:
 
-| Variable | Purpose |
+```dotenv
+YOUDUB_AUTH_PASSWORD_HASH='<paste the complete Argon2id hash>'
+DEVICE=cpu
+OPENAI_BASE_URL=https://api.openai.com/v1
+OPENAI_API_KEY=
+OPENAI_MODEL=
+```
+
+Set `DEVICE=cuda` if CUDA is available. You can also configure the translation API URL, key, and model in Settings after login. Keep the `YOUDUB_*` names: these are the configuration keys the application currently reads.
+
+### 4. Start the workspace
+
+Run the backend and frontend in separate terminals, both from the repository root:
+
+```bash
+# Terminal 1: backend
+.venv/bin/python -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+```bash
+# Terminal 2: frontend
+npm --prefix apps/web run dev -- --hostname 127.0.0.1 --port 3000
+```
+
+On Windows, substitute the virtual environment's Python path in the backend command. Open [http://127.0.0.1:3000](http://127.0.0.1:3000) and sign in with the password you just set.
+
+The frontend proxies same-origin `/api` requests to the backend. If port 8000 is occupied, start the backend on 8001 and set the following in the frontend terminal before launching it:
+
+```bash
+# macOS / Linux / WSL2
+export NEXT_SERVER_API_BASE_URL=http://127.0.0.1:8001
+```
+
+```powershell
+# Windows PowerShell
+$env:NEXT_SERVER_API_BASE_URL = "http://127.0.0.1:8001"
+```
+
+<a id="usage"></a>
+
+## Usage
+
+### Create a task
+
+1. Configure the translation API, model, and concurrency in Settings. Add Netscape-format YouTube cookies and a download proxy if needed.
+2. Submit a video URL or upload a local file, then select the translation direction and output mode.
+3. Leave human review enabled by default, or disable it to let the task finish automatically.
+4. Open the task details to inspect stage progress and logs.
+
+### Review and audition
+
+1. Open the review workspace when the task reaches `awaiting_review`.
+2. Select a segment and edit its translation, start / end time, speaker, and audio mode.
+3. Save, then audition the source vocals or generate a TTS preview. Previews and final rendering share the serial queue and wait for the current job.
+4. Resolve blocking errors such as empty translations or invalid time ranges. High character rates and short reference clips are advisory warnings for you to assess.
+5. Approve the review to continue rendering, then play or download the MP4 from the task details.
+
+### Revise a completed video
+
+Saving segment changes marks the result as needing regeneration. Use “Apply all changes” to update affected TTS clips, the audio mix, and the video. Subtitle-only tasks update subtitle rendering directly; existing downloads, source separation, transcripts, and translations are reused.
+
+```text
+Import → Transcribe / translate → Review → Approve → Render video
+                                   ↑                     │
+                                   └── Edit segments ────┘
+                                            ↓
+                                   Partial render → Updated video
+```
+
+API task creation still defaults to `review_mode=none`; the WebUI submits `required` by default. Opening review for an older task can load its segments from an existing translation artifact.
+
+<a id="configuration"></a>
+
+## Configuration
+
+See [env.txt.example](env.txt.example) and [.env.example](.env.example) for configuration examples. The application reads `.env` at the repository root on startup.
+
+| Setting | Purpose / default |
 | --- | --- |
-| `WORKFOLDER` | Per-task media, audio segments, and intermediate artifacts. |
-| `MODEL_CACHE_DIR` | ModelScope cache directory, used by VoxCPM2 by default. |
-| `YOUDUB_AUTH_PASSWORD_HASH` | Required Argon2id login-password hash; plaintext passwords are rejected. |
-| `YOUDUB_AUTH_SESSION_TTL_SECONDS` | Absolute session lifetime. Default: `604800` seconds (7 days). |
-| `YOUDUB_AUTH_COOKIE_SECURE` | Must be `true` under HTTPS; use `false` only for trusted local HTTP development. |
-| `YOUDUB_AUTH_COOKIE_SAMESITE` | Session Cookie SameSite policy: `lax` or `strict`; `strict` is recommended with the same-origin proxy. |
-| `DEVICE` | Model runtime device, for example `auto`, `cuda`, `cuda:0`, `mps`, `mps:0`, or `cpu`; `auto` selects CUDA, then MPS, then CPU. |
-| `DEMUCS_DEVICE` / `WHISPER_DEVICE` | Optional component-level device overrides. Empty values use `DEVICE`. Whisper falls back to CPU when MPS is selected because word timestamp alignment depends on float64 DTW, which MPS does not support. |
-| `DEMUCS_CHUNK_SECONDS` | Source-separation window length. It must be a positive integer and defaults to `600` (10 minutes). Peak memory is bounded by one “window + 10 seconds of context” inference and two 10-second overlap tails. After each window is written, full input and output tensors are released before the next inference; only the two tails cross the window boundary, so memory does not accumulate with video length or window count. About 2.8 GiB for the default window is a reference estimate; the model, `shifts`, device, and backend libraries affect the actual peak. The first audio stream is decoded as float32: mono is duplicated to stereo, while inputs with two or more channels keep only the first two channels. The temporary input uses FFmpeg WAV `-rf64 auto`, which switches to RF64 beyond the RIFF limit. Both float32 stems and both final PCM16 outputs always use RF64, removing the classic WAV 4 GiB boundary. Temporary bytes are approximately “duration seconds × sample rate × channels × (4 + 4 × 2)”: 3.55 GiB per hour at 44.1 kHz stereo. The final outputs add 1.18 GiB per hour while being written, so allow at least 4.73 GiB per input hour. Temporary files are removed after success or failure. |
-| `RELEASE_GPU_MEMORY_AFTER_STAGE` | Defaults to `true`. Model references and available CUDA/MPS caches are released after the Demucs, Whisper, and VoxCPM stages, with another cleanup in task finalization. The single-thread pipeline does not use those models again in the same task. Set it to `false` to retain model caches across tasks and reduce reload latency while accepting higher persistent GPU memory use and OOM risk. Accepted values are `1/0`, `true/false`, `yes/no`, and `on/off`. |
-| `FFMPEG_PATH` / `FFPROBE_PATH` | Optional full paths to the media binaries. On Windows with TorchCodec, `FFMPEG_PATH` must point to a shared/full-shared build. |
-| `OPENAI_BASE_URL` | OpenAI-compatible API endpoint, for example `https://api.openai.com/v1`. |
-| `OPENAI_API_KEY` | API key used by the translation stage. |
-| `OPENAI_MODEL` | Chat Completions model used by the translation stage. |
-| `OPENAI_TRANSLATE_CONCURRENCY` | Parallel requests during translation. Default: `50`. |
-| `LOCAL_UPLOAD_MAX_BYTES` | Maximum local video upload size. Default: 4 GiB. |
-| `LOCAL_SUBTITLE_MAX_BYTES` | Maximum optional local SRT subtitle upload size. Default: 20 MiB. |
-| `YTDLP_PROXY_PORT` | Local proxy port used by yt-dlp, for example `7890`. |
-| `HTTP_PROXY` / `ALL_PROXY` | yt-dlp reads `HTTP_PROXY` when no UI proxy port is set; HTTPX/OpenAI SDK also reads these environment proxies. |
-| `NO_PROXY` | Comma-separated proxy bypass list. Include `localhost,127.0.0.1,::1` when using a local OpenAI-compatible service so local requests stay direct. |
-| `VOXCPM_MODEL` / `VOXCPM_MODEL_DIR` | VoxCPM2 ModelScope model ID or local model directory. VoxCPM currently selects CUDA/MPS/CPU inside the upstream package, and task logs report it as `voxcpm=library-auto`. |
-| `VOXCPM_LOAD_DENOISER` / `VOXCPM_CFG_VALUE` / `VOXCPM_INFERENCE_TIMESTEPS` / `VOXCPM_MIN_REFERENCE_MS` | VoxCPM2 inference controls. |
-| `CORS_ALLOW_ORIGINS` / `CORS_ALLOW_ORIGIN_REGEX` | Explicitly trusted cross-origin frontends; `*` is not allowed. Same-origin Next proxying needs no entry. |
+| `YOUDUB_AUTH_PASSWORD_HASH` | Required login hash. Sessions expire after 7 days by default. |
+| `DEVICE` | Device selection for Whisper / Demucs. Example files default to `cuda`; change this if CUDA is unavailable. |
+| `DEMUCS_DEVICE` / `WHISPER_DEVICE` | Per-component device overrides. |
+| `FFMPEG_PATH` / `FFPROBE_PATH` | Absolute paths to FFmpeg / ffprobe. |
+| `OPENAI_BASE_URL` / `OPENAI_API_KEY` / `OPENAI_MODEL` | Default translation service; also configurable in the UI. |
+| `OPENAI_TRANSLATE_CONCURRENCY` | Translation request concurrency, default 50. Adjust for your service quota. |
+| `VOXCPM_MODEL` / `VOXCPM_MODEL_DIR` | VoxCPM2 model name / local model directory. |
+| `VOXCPM_MIN_REFERENCE_MS` | Minimum TTS reference length, default 1200 ms. |
+| `DEMUCS_CHUNK_SECONDS` | Source-separation chunk length, default 600 seconds. |
+| `RELEASE_GPU_MEMORY_AFTER_STAGE` | Default `true`: release model references and available device caches after each stage. |
+| `LOCAL_UPLOAD_MAX_BYTES` / `LOCAL_SUBTITLE_MAX_BYTES` | Upload limits for local videos / SRT files. |
+| `YTDLP_PROXY_PORT` / `HTTP_PROXY` / `ALL_PROXY` | Proxy configuration for downloads or API requests. |
+| `NO_PROXY` | Include `localhost,127.0.0.1,::1` when using a local API. |
+| `NEXT_SERVER_API_BASE_URL` | Backend URL in the frontend process environment; defaults to `http://127.0.0.1:8000`. |
 
-Demucs outputs use same-directory pending publication. Each actual handler run first removes old final files and stale pending files, then fully writes `.audio_vocals.pending.wav` and `.audio_bgm.pending.wav`. Only after both files have been closed successfully are they atomically replaced into `audio_vocals.wav` and `audio_bgm.wav`. A normal exception removes pending files and any single final already published. SIGKILL or power loss can leave pending files or one final; a failed/running stage recovery removes them and recomputes both outputs. A truly succeeded stage is restored from PipelineRunner stage metadata without invoking the handler again.
+Non-sensitive provider parameters are saved in task snapshots. Existing tasks can reuse those snapshots when rerun; global setting changes primarily affect new tasks.
 
-By default, CORS allows only `localhost`, `127.0.0.1`, and `::1` on port `3000`. Prefer the same-origin Next.js `/api` proxy. If the browser must call a different backend origin directly, add the exact trusted origin to `CORS_ALLOW_ORIGINS`, for example `https://dubloom.example.com`. CORS is not authentication or CSRF protection; the backend still validates the HttpOnly session Cookie and a per-session CSRF token.
+<a id="data"></a>
 
-### 5. Run
+## Local data and outputs
 
-#### Windows PowerShell
+| Default path | Contents |
+| --- | --- |
+| `data/youdub.sqlite` | Tasks, subtitle segments, provider profiles, jobs, and login sessions. |
+| `data/cookies/` | Cookies used for downloading. |
+| `data/logs/` | Task execution logs. |
+| `data/modelscope/` | Model cache; configurable with `MODEL_CACHE_DIR`. |
+| `workfolder/_uploads/` | Uploaded local files. |
+| `workfolder/<session>/metadata/` | Transcripts, translations, and timing information. |
+| `workfolder/<session>/segments/` | Source clips, TTS files, previews, and time-stretched audio. |
+| `workfolder/<session>/media/video_final.mp4` | Final rendered video. |
 
-Backend:
+Set `WORKFOLDER` to change the task-artifact root. Environment files, runtime databases, cookies, logs, and media directories are excluded from Git. They may still contain sensitive content; review them before sharing.
 
-```powershell
-.\.venv\Scripts\uvicorn.exe backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
+On POSIX systems, startup restricts runtime directory and file permissions and rejects unsafe paths. Windows deployments need appropriate NTFS permissions configured separately. Access from other machines requires explicit listening addresses, an HTTPS reverse proxy, and `YOUDUB_AUTH_COOKIE_SECURE=true`; browsers should continue using the frontend's same-origin API.
 
-Frontend:
+<a id="development"></a>
 
-```powershell
-npm --prefix apps/web run dev -- --hostname 0.0.0.0 --port 3000
-```
+## Development and checks
 
-#### macOS / Linux / WSL2
-
-Backend:
-
-```bash
-.venv/bin/uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000
-```
-
-Frontend:
-
-```bash
-npm --prefix apps/web run dev -- --hostname 0.0.0.0 --port 3000
-```
-
-By default, the frontend calls same-origin `/api/...` URLs and Next.js proxies them to `http://127.0.0.1:8000`. If the backend is not on local port `8000`, set `NEXT_SERVER_API_BASE_URL` when starting the frontend, for example:
-
-```bash
-NEXT_SERVER_API_BASE_URL=http://192.168.1.10:8000 npm --prefix apps/web run dev -- --hostname 0.0.0.0 --port 3000
-```
-
-Open:
+The frontend uses Next.js App Router, React, Tailwind CSS, and shadcn/ui. The backend uses FastAPI and SQLite, with yt-dlp, Demucs, Whisper, VoxCPM2, and FFmpeg for media processing.
 
 ```text
-http://localhost:3000
+apps/web/              Next.js UI and frontend tests
+backend/app/           API, database, worker, and pipeline
+backend/app/providers/ Translation / TTS interfaces and defaults
+backend/app/adapters/  Download, ASR, audio, and model adapters
+backend/tests/         Backend tests
+scripts/               Helper scripts
+submodule/demucs/      Demucs source submodule
 ```
 
-When opening the app from LAN, WSL2, or another machine, use the actual frontend host IP or hostname, for example `http://192.168.1.20:3000`. The backend listens on `0.0.0.0:8000`, and the frontend listens on `0.0.0.0:3000`.
-
-Browsers should always open the frontend URL and let Next.js forward `/api`; never place authentication data in `NEXT_PUBLIC_*`, URL queries, or browser storage. For LAN or public access, put the frontend behind an HTTPS reverse proxy and set `YOUDUB_AUTH_COOKIE_SECURE=true`. Plain HTTP is suitable only for trusted local development.
-
-### Runtime File Permissions
-
-On POSIX systems, the backend permanently sets process `umask 0077` before reading `.env`, opening SQLite, or starting the worker. Startup migration inspects filesystem metadata only; it does not read or rewrite file contents. The policy is:
-
-- Directories under `data/`, Cookie and log storage, and `WORKFOLDER` are restricted to `0700`; regular files are restricted to `0600`.
-- The SQLite database and its `-journal`, `-wal`, and `-shm` sidecars, `.env`, `env.txt`, cookies, uploads, and newly generated artifacts remain owner-only.
-- Symlinks, special files, foreign-owned nodes, or unsafe writable ancestors make startup fail closed; the worker does not start after a migration failure.
-- The `MODEL_CACHE_DIR` root must be owned by root or the service account and must not be writable by other users. A service-owned cache root is restricted to `0700`. Its contents are not recursively chmodded or validated, so any existing model cache must be trusted before deployment.
-
-Run the service under a dedicated OS account, and ensure that the repository and any custom `WORKFOLDER` parent cannot be renamed by untrusted groups or users. This boundary protects against other UIDs and untrusted groups; it does not protect against same-UID processes, debuggers, or root. Use a dedicated account, container, or service sandbox for stronger isolation.
-
-Before the first permission migration, stop any older instance that may still create or delete runtime files. If a concurrent startup fails closed during migration, stop the older instance and retry startup.
-
-On Windows, `chmod` and `umask` are not substitutes for NTFS ACLs. Restrict the DACL for the repository, `.env`, `env.txt`, `data`, and `WORKFOLDER` to the service account; the application's compatibility checks cannot replace correct ACLs. Real `.env`, `env.txt`, cookie, SQLite, `data/`, and `workfolder/` files are covered by `.gitignore`; never force-add them to Git.
-
-## Using the Web UI
-
-1. Sign in with the access password whose hash you configured.
-2. Open Settings in the top-right corner.
-3. Paste Netscape-format YouTube cookies.
-4. Set the yt-dlp proxy port, such as `7890` or `20171`.
-5. Enter the OpenAI base URL and API key.
-6. Click `Get models` to fetch model IDs, or enter a model manually.
-7. Tune `Translate concurrency` based on your API provider's rate limits.
-8. Return to the home page and submit a YouTube URL, Bilibili URL, or local video.
-   - Under `Output content`, choose `Hard subtitles (original audio)`, `Dubbing (no hard subtitles)`, or `Hard subtitles and dubbing`.
-   - Human review is enabled by default. The task pauses after translation instead of immediately generating dubbing and the final video; disable it to retain the legacy fully automatic flow.
-   - Existing translation and TTS Provider Profiles can be selected per task. The default profiles keep the current OpenAI-compatible and VoxCPM2 behavior.
-   - Local videos can include an already translated `.srt` file. When provided, Dubloom skips Whisper and OpenAI translation, then uses that file according to the selected output content.
-   - Local videos support `English -> Chinese`, `Japanese -> Chinese`, and `Chinese -> English`. The direction also determines the optional subtitle's target language; for example, `Japanese -> Chinese` treats the uploaded SRT as Chinese subtitles.
-9. When a task is awaiting review, open the review workspace to edit text, timing, speaker, audio mode, and TTS Profile, and to audition source or generated audio.
-10. Approve the review to continue from audio splitting. Editing a completed task marks its result stale; applying changes regenerates only dirty segments and downstream mixes/renders.
-
-API keys and cookies are masked in the UI. The backend does not return plaintext cookie content to the frontend.
-
-### Exporting YouTube cookies
-
-A convenient option is the open-source Chrome extension [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc), which keeps cookies on your machine:
-
-1. Install and enable the extension in Chrome.
-2. Sign in to `https://www.youtube.com`.
-3. On a youtube.com page, click the extension icon and choose `Export` -> `Netscape` to get `cookies.txt`.
-4. Paste the full file content into the YouTube cookie field in Settings.
-
-Only process videos you have the right to download, transform, and publish.
-
-## Pipeline
-
-```text
-YouTube / Bilibili URL
-  -> yt-dlp downloads one video
-  -> Demucs separates vocals and background audio
-  -> Whisper transcribes speech with word timestamps
-  -> Sentence and timing normalization
-  -> OpenAI-compatible API preprocesses the full transcript and translates sentences in parallel
-  -> Optional human review: edit, audition, preview TTS, and approve
-  -> Branch by output content:
-     - subtitles: preserve original audio and burn hard subtitles
-     - dubbing: generate and mix target-language dubbing without hard subtitles
-     - both: generate and mix dubbing, then burn hard subtitles
-  -> FFmpeg renders the final mp4
-```
-
-Local video uploads use the same later pipeline stages, supporting English or Japanese speech translated into Chinese and Chinese speech translated into English. The Japanese path passes `ja` to Whisper and uses a dedicated Japanese-to-Chinese prompt. If an already translated `.srt` file is uploaded with the video, Dubloom converts the SRT into its internal timed translation format, skips Whisper and OpenAI translation, then continues according to the selected output content. In v1 this is limited to local video uploads with `.srt`; URL tasks cannot attach subtitle files.
-
-## Highlights
-
-- **Real end-to-end workflow**: URL in, final video out. No manual audio slicing, subtitle editing, or video rendering steps.
-- **Two source paths**: YouTube English -> Chinese is the primary mature workflow; Bilibili Chinese -> English is wired into the same task pipeline.
-- **Three output modes**: Produce hard subtitles with original audio, dubbing without hard subtitles, or both together.
-- **Local-first storage**: SQLite state, cookies, logs, intermediate artifacts, and final videos stay on your machine.
-- **Observable task progress**: Task history, stage status, stage duration, logs, and errors are visible in the web UI.
-- **Resume after failure**: Failed tasks can resume from the failed stage, reusing cached outputs from stages that already succeeded.
-- **Segment-level quality control**: Pause after translation for optimistic-lock editing, hard validation, reading-speed warnings, source audition, and TTS previews.
-- **Partial regeneration**: Post-render edits invalidate only affected TTS segments and downstream audio/video artifacts.
-- **Provider abstraction**: Translation and TTS run through provider interfaces while the default OpenAI-compatible and VoxCPM2 implementations remain unchanged.
-- **Durable job queue**: Pipeline, preview, and dirty-render jobs are stored in SQLite and recovered after process restarts.
-- **Rerun and clean up**: Rerun a task from scratch, or delete its database row, log file, and session directory under `workfolder/`.
-- **Inspect the result**: Successful tasks expose an inline video player and an mp4 download link.
-- **Settings in the UI**: YouTube cookies, yt-dlp proxy port, OpenAI base URL, API key, model name, and translation concurrency can be maintained from Settings.
-- **Hackable architecture**: The pipeline is serial and module boundaries are clear, making it practical to replace ASR, translation, TTS, or subtitle rendering.
-
-## Tech Stack
-
-- Frontend: Next.js App Router, shadcn/ui, Tailwind CSS, Lucide icons
-- Backend: FastAPI, SQLite, persistent single-GPU FIFO worker
-- Download: yt-dlp
-- Source separation: Demucs source submodule
-- ASR: openai-whisper, defaulting to `large-v3-turbo`
-- Translation: OpenAI-compatible Chat Completions API
-- TTS: VoxCPM2
-- Media processing: FFmpeg, pydub, librosa, audiostretchy
-
-## Development and Tests
-
-Backend tests:
-
-Windows PowerShell:
-
-```powershell
-.\.venv\Scripts\pytest.exe backend/tests
-```
-
-macOS / Linux / WSL2:
+With dependencies installed, run:
 
 ```bash
-.venv/bin/pytest backend/tests
-```
-
-Frontend checks:
-
-```powershell
+.venv/bin/python -m pytest backend/tests -q
+npm --prefix apps/web test
 npm --prefix apps/web run lint
+(cd apps/web && npx tsc --noEmit)
 npm --prefix apps/web run build
 ```
 
-Main project directories:
+On Windows, use the virtual environment's `python.exe`. For the type check, `cd apps/web`, run `npx tsc --noEmit`, and return to the repository root.
 
-```text
-backend/app/       FastAPI API, task worker, pipeline, and model adapters
-backend/tests/     Backend unit tests
-apps/web/          Next.js WebUI
-scripts/           Helper scripts
-submodule/demucs/  Demucs source submodule
-```
+Backend unit tests can use a separate environment with only [backend/requirements-test.txt](backend/requirements-test.txt), without downloading models. The [CI workflow](.github/workflows/ci.yml) covers backend tests, frontend tests, linting, type checking, production builds, and dependency auditing. Automated checks do not establish translation or voice quality on real media.
 
-## Project Status and Contributing
+<a id="contributing"></a>
 
-Dubloom Studio is currently a local creator review workspace. It preserves the upstream project's proven serial video-processing foundation while focusing on post-translation human review, per-line auditioning, and partial regeneration. The project remains an MVP, prioritizing a stable shortest path and readable architecture.
+## Contributing
 
-Contributions are welcome:
+Use [Issues](https://github.com/wind-far/dubloom/issues) for bugs and feature requests, and [Pull Requests](https://github.com/wind-far/dubloom/pulls) for code contributions. Include your OS, runtime versions, reproduction steps, and redacted logs in bug reports. Add relevant tests for functional changes and keep both README versions in sync.
 
-- Improve installation and model download experience.
-- Add more ASR, TTS, or translation backends.
-- Improve subtitle styling, portrait/landscape layouts, and voice timing alignment.
-- Make YouTube / Bilibili downloading more robust.
-- Improve task management, artifact management, and failure recovery.
-- Add runtime notes for more platforms.
-
-If this project is useful to you, please Star it, Fork it, open Issues or PRs, and share it with people interested in AI video localization, open-source tools, and cross-language content.
-
-## Upstream Community
-
-The recruitment and community details below are maintained by the YouDub-webui upstream author. They are not official Dubloom Studio channels.
-
-YouDub-webui QQ group: `618246010`
-
-<p align="center">
-  <img src="apps/web/public/qq-group-618246010.jpg" alt="YouDub-webui upstream QQ group QR code" width="220" />
-</p>
+<a id="license"></a>
 
 ## License
 
-Dubloom Studio modifications remain licensed under the Apache License 2.0. See [LICENSE](LICENSE). This project is derived from [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui), created by Zhao Liu. Redistributions of modified versions must retain the license, original copyright notices, and applicable third-party model notices. Dubloom Studio is an independent derivative, not an official upstream release.
-
-## Upstream Star History
-
-The chart below tracks the YouDub-webui upstream repository, not the current Dubloom Studio repository.
-
-<a href="https://www.star-history.com/?repos=liuzhao1225%2FYouDub-webui&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&theme=dark&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
- </picture>
-</a>
+This project uses the [Apache License 2.0](LICENSE). Third-party dependencies and models remain subject to their respective licenses.

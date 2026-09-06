@@ -1,5 +1,6 @@
 {
-  "name": "youdub-webui-fullstack",
+  "name": "dubloom-studio",
+  "description": "Dubloom Studio - a local creator workspace for line-by-line dubbing review",
   "private": true,
   "license": "Apache-2.0",
   "scripts": {

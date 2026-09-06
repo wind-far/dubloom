@@ -1,30 +1,33 @@
 <p align="center">
-  <img src="apps/web/public/youdub-logo.svg" alt="YouDub" width="520" />
+  <strong>Dubloom Studio · 织声</strong><br />
+  <em>逐句校准，让译制更像创作</em>
 </p>
 
-# YouDub WebUI | [人才招聘](#人才招聘)
+# Dubloom（织声）
 
 <p align="center">
-  <strong>QQ 交流群：618246010</strong>
+  <strong>面向本地创作者的译制校审工作台</strong>
 </p>
 
-一个被真实创作者工作流验证过的开源视频本地化工具。
+Dubloom Studio 是一个面向个人创作者与小团队的本地视频译制工作台。
 
-YouDub WebUI 可以把单个 YouTube、Bilibili 或本地视频转换成目标语言版本：导入视频、识别并翻译内容，再按任务选择输出保留原音的硬字幕视频、无硬字幕的配音视频，或同时包含硬字幕与配音的视频。配音模式还会分离人声与背景音、生成配音并完成混音，最终视频可在网页中播放和下载。
+它可以把单个 YouTube、Bilibili 或本地视频转换成目标语言版本：导入视频、识别并翻译内容，在逐句校审工作台中调整译文、时间码、说话人和发音配置，再按任务选择输出保留原音的硬字幕视频、无硬字幕的配音视频，或同时包含硬字幕与配音的视频。配音模式还会分离人声与背景音、生成配音并完成混音，最终视频可在网页中播放和下载。
 
-核心成熟场景是 **YouTube 英文 -> 中文配音**；同时已经支持 **Bilibili 中文 -> 英文配音**，并接入本地视频 **日文 -> 中文配音**。日译中方向已通过自动化参数链路和回归测试，尚未使用真实日语媒体完成模型效果验收。
+上游项目的核心成熟场景是 **YouTube 英文 -> 中文配音**；Dubloom Studio 保留该能力，同时支持 **Bilibili 中文 -> 英文配音** 和本地视频 **日文 -> 中文配音**。日译中方向已通过自动化参数链路和回归测试，尚未使用真实日语媒体完成模型效果验收。
 
-English README: [README.en.md](README.en.md) · 作者：[刘朝 Zhao Liu](https://liuzhao1225.github.io/)（GitHub [@liuzhao1225](https://github.com/liuzhao1225)，Bilibili [黑纹白斑马](https://space.bilibili.com/1263732318)）
+> **来源与独立性声明：** Dubloom Studio 是基于 [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui) 的独立二次开发版本，并非 YouDub-webui 原作者发布或背书的官方版本。上游原作者为 [刘朝 Zhao Liu](https://liuzhao1225.github.io/)（GitHub [@liuzhao1225](https://github.com/liuzhao1225)，Bilibili [黑纹白斑马](https://space.bilibili.com/1263732318)）。为兼容既有部署，代码中的 `YOUDUB_*` 环境变量、部分文件名和 API 路径暂不重命名。
 
-## 真实生产案例
+English README: [README.en.md](README.en.md)
+
+## 上游验证过的创作者工作流
 
 **作者的 B 站频道**：[黑纹白斑马](https://space.bilibili.com/1263732318)（粉丝 100 万+，视频 2 万+，累计播放 6.8 亿+）的全站作品均使用 YouDub WebUI 自动翻译配音，覆盖科技、游戏、科普、动物、历史等题材。
 
-这不是一个只跑过 demo 的玩具项目。YouDub WebUI 的目标很明确：让个人创作者、开发者和小团队能够在本地掌控一条完整的视频本地化流水线，并且保留足够简单的架构，方便理解、调试和二次开发。
+上述案例用于说明上游 YouDub-webui 已经验证的视频处理基础，不代表原作者参与或认可 Dubloom Studio 的改版。Dubloom 在这条本地化流水线之上增加了翻译后校审、逐句试听和局部重生成能力。
 
 ## 效果示例
 
-下面两组样例均由本项目真实生成，可以在 GitHub 页面直接播放。左侧是原视频，右侧是自动生成的配音版本；配音版包含目标语言语音和字幕，同时保留原视频的背景音乐与音效。
+下面两组样例来自上游 YouDub-webui，可以在 GitHub 页面直接播放。左侧是原视频，右侧是自动生成的配音版本；配音版包含目标语言语音和字幕，同时保留原视频的背景音乐与音效。
 
 ### 1. Jensen Huang on Nvidia's Competition
 
@@ -111,7 +114,7 @@ Get-ChildItem "$ffmpegBin\av*.dll"
 & "$ffmpegBin\ffprobe.exe" -version
 ```
 
-记下通过检查的 `bin` 目录；在第 4 步创建 `.env` 后填入该实际路径。Python 3.8+ 的 DLL 加载规则需要应用显式注册搜索目录；单独修改 `PATH` 无法保证 TorchCodec 找到这些 DLL。YouDub 启动时会读取 `FFMPEG_PATH`，检查同目录的 `av*.dll`，并通过 `os.add_dll_directory()` 注册该目录。配置错误会在启动阶段直接给出原因。
+记下通过检查的 `bin` 目录；在第 4 步创建 `.env` 后填入该实际路径。Python 3.8+ 的 DLL 加载规则需要应用显式注册搜索目录；单独修改 `PATH` 无法保证 TorchCodec 找到这些 DLL。Dubloom 启动时会读取 `FFMPEG_PATH`，检查同目录的 `av*.dll`，并通过 `os.add_dll_directory()` 注册该目录。配置错误会在启动阶段直接给出原因。
 
 ```bash
 # Ubuntu / Debian / WSL2
@@ -126,17 +129,17 @@ brew install ffmpeg node
 
 如果你的系统包管理器无法提供 Python 3.12，建议从 Python 官网、pyenv、conda/mamba 或发行版推荐方式安装；关键是后续创建虚拟环境时确认使用的是 3.12。
 
-### 2. 克隆项目
+### 2. 获取项目
 
-Windows PowerShell、macOS 和 Linux 通用：
+从当前 Dubloom Studio 仓库页面复制实际仓库地址，并在 Windows PowerShell、macOS 或 Linux 中执行：
 
 ```powershell
-git clone https://github.com/liuzhao1225/YouDub-webui.git
-cd YouDub-webui
+git clone 当前-Dubloom-仓库地址 Dubloom
+cd Dubloom
 git submodule update --init --recursive
 ```
 
-Demucs 以源码子模块引入，请不要跳过 `git submodule update`。
+Demucs 以源码子模块引入，请不要跳过 `git submodule update`。如需核对原始实现或同步上游，请访问 [YouDub-webui 上游仓库](https://github.com/liuzhao1225/YouDub-webui)；该链接不是 Dubloom Studio 的发布地址。
 
 ### 3. 安装依赖
 
@@ -228,13 +231,13 @@ FFPROBE_PATH=C:/path/to/ffmpeg/bin/ffprobe.exe
 Windows PowerShell：
 
 ```powershell
-.\.venv\Scripts\python.exe -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('YouDub password: ')))"
+.\.venv\Scripts\python.exe -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('Dubloom password: ')))"
 ```
 
 macOS / Linux / WSL2：
 
 ```bash
-.venv/bin/python -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('YouDub password: ')))"
+.venv/bin/python -c "from getpass import getpass; from pwdlib import PasswordHash; print(PasswordHash.recommended().hash(getpass('Dubloom password: ')))"
 ```
 
 把输出的整行哈希填入 `.env` 的 `YOUDUB_AUTH_PASSWORD_HASH`。不要填写明文密码，也不要把真实哈希提交到 Git。
@@ -269,7 +272,7 @@ macOS / Linux / WSL2：
 
 Demucs 分离结果采用同目录 pending 发布：handler 每次实际执行时先删除旧 final 和遗留 pending，再完整生成 `.audio_vocals.pending.wav` 与 `.audio_bgm.pending.wav`；两份文件都关闭写完后，才分别原子替换 `audio_vocals.wav` 与 `audio_bgm.wav`。普通异常会删除 pending 和已经发布的单份 final。SIGKILL 或掉电可能留下 pending 或单份 final，failed/running stage 再次恢复时会先清理并完整重算。真正 succeeded 的 stage 由 PipelineRunner 根据 stage 元数据恢复，不会再次调用 handler。
 
-默认 CORS 只允许 `localhost`、`127.0.0.1` 和 `::1` 的 `:3000`。推荐始终使用 Next.js 同源 `/api` 代理；如果浏览器确实直连不同 origin 的后端，必须把完整、可信的 origin 追加到 `CORS_ALLOW_ORIGINS`，例如 `https://youdub.example.com`。CORS 不是认证或 CSRF 防护，后端仍会校验 HttpOnly 会话 Cookie 和每会话 CSRF token。
+默认 CORS 只允许 `localhost`、`127.0.0.1` 和 `::1` 的 `:3000`。推荐始终使用 Next.js 同源 `/api` 代理；如果浏览器确实直连不同 origin 的后端，必须把完整、可信的 origin 追加到 `CORS_ALLOW_ORIGINS`，例如 `https://dubloom.example.com`。CORS 不是认证或 CSRF 防护，后端仍会校验 HttpOnly 会话 Cookie 和每会话 CSRF token。
 
 ### 5. 启动服务
 
@@ -343,9 +346,12 @@ Windows 的 `chmod`/`umask` 不等价于 NTFS ACL。Windows 部署需由管理�
 7. 按 API 提供商额度调整 `Translate concurrency`。
 8. 回到首页，提交 YouTube URL、Bilibili URL，或上传本地视频。
    - 在“输出内容”中选择“硬字幕（保留原音）”“配音（无硬字幕）”或“硬字幕和配音”。
-   - 本地视频可额外上传一份已翻译好的 `.srt` 字幕；上传后会跳过 Whisper 识别和 OpenAI 翻译，再按所选输出内容使用这份字幕。
+   - “人工校审”默认开启：翻译完成后任务会停在“等待校审”，不会直接生成配音和成片；若希望保持旧版全自动行为，可关闭人工校审。
+   - 已创建的翻译 / TTS Provider Profile 可以在提交任务时选择；未选择时继续使用现有 OpenAI-compatible 与 VoxCPM2 默认配置。
+   - 本地视频可额外上传一份已翻译好的 `.srt` 字幕；上传后 Dubloom 会跳过 Whisper 识别和 OpenAI 翻译，再按所选输出内容使用这份字幕。
    - 本地视频支持“英文 -> 中文”“日文 -> 中文”和“中文 -> 英文”。翻译方向也决定可选字幕的目标语言，例如选择“日文 -> 中文”时，上传的 SRT 会被视为中文字幕。
-9. 进入任务详情页查看阶段进度、运行日志和最终视频。
+9. 进入任务详情页查看阶段进度；等待校审时打开校审工作台，逐句修改译文、时间码、说话人、发音方式和 TTS Profile，并试听原声或生成 TTS 预览。
+10. 批准校审后任务从切分音频阶段继续运行。成片后再次编辑会把结果标记为“需要重新生成”；应用更改时仅重做脏片段及后续混音、封装。
 
 API key 和 Cookie 会在页面中脱敏显示，后端不会把 Cookie 明文返回给前端。
 
@@ -369,6 +375,7 @@ YouTube / Bilibili URL
   -> Whisper 识别语音并输出词级时间戳
   -> 句子与时间范围整理
   -> OpenAI 兼容 API 预处理全文并逐句并发翻译
+  -> 可选人工校审：逐句编辑、试听、TTS 预览与批准
   -> 按输出内容分支：
      - subtitles：保留原音并压制硬字幕
      - dubbing：生成并混合目标语言配音，不压制硬字幕
@@ -386,6 +393,10 @@ YouTube / Bilibili URL
 - **本地优先**：SQLite、Cookie、日志、中间产物和最终视频都保存在本机目录中。
 - **可观察任务进度**：任务历史、阶段状态、阶段耗时、运行日志和错误信息都可以在页面里查看。
 - **失败可恢复**：失败任务可以从失败阶段继续执行，已成功阶段会复用缓存产物。
+- **逐句质量控制**：翻译后可暂停校审，支持乐观锁保存、硬错误校验、语速提示、原声试听和 TTS 预览。
+- **局部重生成**：成片后修改只失效相关 TTS 片段以及混音、视频产物，不重新下载、分离、识别或翻译。
+- **模型适配层**：翻译与 TTS 通过 Provider 接口调用；默认实现保持 OpenAI-compatible 与 VoxCPM2，并支持保存任务配置快照。
+- **持久化作业队列**：Pipeline、逐句预览和脏段渲染作业写入 SQLite，进程重启后可恢复排队中的工作。
 - **可重跑可清理**：支持按任务 rerun，也支持删除任务记录、日志和 `workfolder/` 下的会话目录。
 - **结果可检查**：任务成功后可在页面内播放最终视频，也可以下载 mp4 文件。
 - **设置在 UI 内完成**：YouTube Cookie、yt-dlp 代理端口、OpenAI base URL、API key、模型名和翻译并发数都可在 Settings 中维护。
@@ -394,7 +405,7 @@ YouTube / Bilibili URL
 ## 技术栈
 
 - Frontend: Next.js App Router, shadcn/ui, Tailwind CSS, Lucide icons
-- Backend: FastAPI, SQLite, in-process background worker
+- Backend: FastAPI, SQLite, persistent single-GPU FIFO worker
 - Download: yt-dlp
 - Source separation: Demucs source submodule
 - ASR: openai-whisper（默认 `large-v3-turbo`）
@@ -437,7 +448,7 @@ submodule/demucs/  Demucs 源码子模块
 
 ## 项目状态与贡献
 
-YouDub WebUI 仍然是 MVP，但已经可以支撑真实创作者的日常视频本地化生产。当前优先级是保持最短链路稳定、保持架构简单，并让更多人能跑起来、改得动。
+Dubloom Studio 当前定位为本地创作者校审工作台：保留上游已经验证的串行视频处理能力，重点建设翻译后人工校审、逐句试听与局部重生成。项目仍处于 MVP 阶段，优先保持最短链路稳定和架构可读。
 
 欢迎贡献：
 
@@ -450,7 +461,11 @@ YouDub WebUI 仍然是 MVP，但已经可以支撑真实创作者的日常视频
 
 如果这个项目对你有帮助，欢迎 Star、Fork、提交 Issue 或 PR，也欢迎分享给关注 AI 视频本地化、开源工具和跨语言内容传播的人。
 
-## 人才招聘
+## 上游社区信息
+
+以下招聘与社区信息由 YouDub-webui 上游作者维护，不代表 Dubloom Studio 的维护团队或官方渠道。
+
+### 上游人才招聘
 
 银河智学是一家人工智能教育科技企业，致力于将大模型技术与探究式教学范式深度融合，构建面向 AGI 时代的创新学习体系。
 
@@ -466,22 +481,24 @@ YouDub WebUI 仍然是 MVP，但已经可以支撑真实创作者的日常视频
 简历投递：[liuzhao@xiaoluxue.com](mailto:liuzhao@xiaoluxue.com)
 
 <p align="center">
-  <img src="apps/web/public/recruitment-poster-2026.jpg" alt="YouDub 人才招聘海报：全栈研发工程师与高级 Go 后端架构师" width="680" />
+  <img src="apps/web/public/recruitment-poster-2026.jpg" alt="YouDub-webui 上游作者人才招聘海报：全栈研发工程师与高级 Go 后端架构师" width="680" />
 </p>
 
-## 社区交流
+### 上游社区交流
 
-QQ 交流群：`618246010`
+YouDub-webui QQ 交流群：`618246010`
 
 <p align="center">
-  <img src="apps/web/public/qq-group-618246010.jpg" alt="YouDub QQ 交流群二维码" width="220" />
+  <img src="apps/web/public/qq-group-618246010.jpg" alt="YouDub-webui 上游 QQ 交流群二维码" width="220" />
 </p>
 
 ## 开源许可
 
-本项目使用 Apache License 2.0，详见 [LICENSE](LICENSE)。
+Dubloom Studio 的修改内容继续使用 Apache License 2.0，详见 [LICENSE](LICENSE)。本项目派生自刘朝 Zhao Liu 创建的 [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui)；再发布修改版时请保留许可证、原始版权与第三方模型许可说明。Dubloom Studio 是独立改版，不是上游原作者发布的官方版本。
 
-## Star History
+## 上游 Star History
+
+下图统计的是 YouDub-webui 上游仓库，不代表 Dubloom Studio 当前仓库的 Star 数量。
 
 <a href="https://www.star-history.com/?repos=liuzhao1225%2FYouDub-webui&type=date&legend=top-left">
  <picture>

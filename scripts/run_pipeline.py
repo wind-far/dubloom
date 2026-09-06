@@ -11,7 +11,7 @@ from backend.app.pipeline import run_task
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Run the YouDub pipeline once.")
+    parser = argparse.ArgumentParser(description="Run the Dubloom localization pipeline once.")
     parser.add_argument("url", help="YouTube video URL")
     parser.add_argument("--task-id", default=None, help="Reuse an existing task id")
     return parser.parse_args()

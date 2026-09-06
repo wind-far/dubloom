@@ -1,18 +1,27 @@
 "use client"
 
+import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { use, useCallback, useMemo, useState } from "react"
 import {
+  Activity,
   CheckCircle2,
   Circle,
   CircleMinus,
   Download,
+  ExternalLink,
   FileText,
+  Film,
+  Gauge,
   Loader2,
   Play,
   RotateCw,
+  Terminal,
   Trash2,
+  Workflow,
   XCircle,
+  AlertTriangle,
+  Languages,
 } from "lucide-react"
 
 import {
@@ -29,6 +38,7 @@ import {
   redoStage,
   rerunTask,
   resumeTask,
+  renderDirtySegments,
 } from "@/lib/api"
 import { useI18n } from "@/lib/i18n"
 import { statusBadgeClass } from "@/lib/status"
@@ -56,11 +66,11 @@ import { Progress } from "@/components/ui/progress"
 import { ScrollArea } from "@/components/ui/scroll-area"
 
 function stageIcon(status: StageStatus) {
-  if (status === "succeeded") return <CheckCircle2 className="size-5 text-[#00aeec]" />
-  if (status === "skipped") return <CircleMinus className="size-5 text-muted-foreground" />
-  if (status === "failed") return <XCircle className="size-5 text-[#ff0033]" />
-  if (status === "running") return <Loader2 className="size-5 animate-spin text-[#fb7299]" />
-  return <Circle className="size-5 text-muted-foreground" />
+  if (status === "succeeded") return <CheckCircle2 className="size-4 text-emerald-600" />
+  if (status === "skipped") return <CircleMinus className="size-4 text-muted-foreground" />
+  if (status === "failed") return <XCircle className="size-4 text-rose-600" />
+  if (status === "running") return <Loader2 className="size-4 animate-spin text-primary" />
+  return <Circle className="size-4 text-black/25" />
 }
 
 function formatTime(value: string | null) {
@@ -107,6 +117,8 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   const [redoingStage, setRedoingStage] = useState<string | null>(null)
   const [redoConfirmStage, setRedoConfirmStage] = useState<string | null>(null)
   const [redoError, setRedoError] = useState("")
+  const [renderingDirty, setRenderingDirty] = useState(false)
+  const [renderDirtyError, setRenderDirtyError] = useState("")
 
   const pollTask = useCallback(async ({ signal, isCurrent }: SerialPollingContext) => {
     try {
@@ -207,6 +219,22 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
     if (succeeded) setRedoConfirmStage(null)
   }
 
+  const handleRenderDirty = async () => {
+    invalidatePolling()
+    setRenderingDirty(true)
+    setRenderDirtyError("")
+    try {
+      const result = await renderDirtySegments(id)
+      if ("stages" in result) setTask(result)
+      else setTask(await getTask(id))
+      invalidatePolling()
+    } catch (err) {
+      setRenderDirtyError(err instanceof Error ? err.message : t.task.renderDirtyError)
+    } finally {
+      setRenderingDirty(false)
+    }
+  }
+
   const isRunning = task?.status === "running"
   const isQueued = task?.status === "queued"
   const isFailed = task?.status === "failed"
@@ -225,11 +253,11 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
 
   if (error && !task) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(135deg,#fff5f5_0%,#f2fbff_48%,#fff4fa_100%)] text-foreground">
-        <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+      <main className="min-h-screen text-foreground">
+        <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
           <AppHeader backHref="/" />
-          <Card>
-            <CardContent className="px-6 py-10 text-sm text-red-600">{error}</CardContent>
+          <Card className="border border-rose-500/20 bg-rose-50 text-foreground ring-0">
+            <CardContent className="px-6 py-10 text-sm text-rose-700">{error}</CardContent>
           </Card>
         </div>
       </main>
@@ -237,104 +265,80 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(135deg,#fff5f5_0%,#f2fbff_48%,#fff4fa_100%)] text-foreground">
-      <div className="mx-auto flex w-full max-w-4xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
-        <AppHeader backHref="/" />
+    <main className="min-h-screen text-foreground">
+      <div className="mx-auto flex w-full max-w-[1500px] flex-col gap-5 px-4 py-5 sm:px-6 lg:px-8">
+        <div className="[&_header]:border-border">
+          <AppHeader backHref="/" />
+        </div>
 
-        <Card>
-          <CardHeader className="gap-3">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <CardTitle>{t.task.overview}</CardTitle>
+        <header className="flex flex-col gap-4 border-b border-border pb-5 lg:flex-row lg:items-end lg:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
+              <Workflow className="size-3.5" /> Production pipeline
               <Badge className={statusBadgeClass(task?.status)}>{statusLabel(task?.status)}</Badge>
             </div>
-            <Progress value={progress} />
-          </CardHeader>
-          <CardContent>
-            {task ? (
-              <dl className="grid grid-cols-1 gap-x-6 gap-y-2 text-sm sm:grid-cols-[120px_1fr]">
-                {task.title ? (
-                  <>
-                    <dt className="text-muted-foreground">{t.task.title}</dt>
-                    <dd className="break-words font-medium">{task.title}</dd>
-                  </>
-                ) : null}
-                <dt className="text-muted-foreground">URL</dt>
-                <dd className="break-all">
-                  <a href={task.url} target="_blank" rel="noreferrer" className="text-[#00aeec] hover:underline">
-                    {task.url}
-                  </a>
-                </dd>
-                <dt className="text-muted-foreground">{t.task.taskId}</dt>
-                <dd className="font-mono text-xs">{task.id}</dd>
-                <dt className="text-muted-foreground">{t.task.created}</dt>
-                <dd>{formatTime(task.created_at)}</dd>
-                <dt className="text-muted-foreground">{t.task.started}</dt>
-                <dd>{formatTime(task.started_at)}</dd>
-                <dt className="text-muted-foreground">{t.task.completed}</dt>
-                <dd>{formatTime(task.completed_at) || "—"}</dd>
-                <dt className="text-muted-foreground">{t.task.executionMode}</dt>
-                <dd>
-                  {task.execution_mode === "manual" ? t.task.executionManual : t.task.executionAuto}
-                </dd>
-                <dt className="text-muted-foreground">{t.task.outputMode}</dt>
-                <dd>
-                  {(task.output_mode || "both") === "subtitles"
-                    ? t.task.outputSubtitles
-                    : (task.output_mode || "both") === "dubbing"
-                      ? t.task.outputDubbing
-                      : t.task.outputBoth}
-                </dd>
-                {task.session_path ? (
-                  <>
-                    <dt className="text-muted-foreground">{t.task.session}</dt>
-                    <dd className="break-all text-xs text-muted-foreground">{task.session_path}</dd>
-                  </>
-                ) : null}
-              </dl>
-            ) : (
-              <div className="py-6 text-center text-sm text-muted-foreground">{t.task.loading}</div>
-            )}
-          </CardContent>
-        </Card>
-
-        {task?.status === "succeeded" && task.final_video_path ? (
-          <Card>
-            <CardHeader>
-              <CardTitle>{t.task.finalVideo}</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3">
-              <video
-                key={task.id}
-                src={finalVideoUrl(task.id)}
-                crossOrigin="use-credentials"
-                controls
-                preload="metadata"
-                className="w-full rounded-md border border-emerald-200 bg-black"
-              />
-              <p className="break-all text-xs text-muted-foreground">{task.final_video_path}</p>
-              <Button nativeButton={false} render={<a href={finalVideoDownloadUrl(task.id)} />}>
-                <Download className="size-4" />
-                {t.task.download}
+            <h1 className="truncate text-2xl font-semibold tracking-tight text-foreground lg:text-3xl">
+              {task?.title || t.task.overview}
+            </h1>
+            <p className="mt-2 truncate font-mono text-xs text-muted-foreground">{task?.id}</p>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {task?.review_mode === "required" ? (
+              <Button nativeButton={false} render={<Link href={`/tasks/${id}/review`} />}>
+                <Languages className="size-4" /> {t.task.reviewWorkspace}
               </Button>
-            </CardContent>
-          </Card>
-        ) : null}
+            ) : null}
+            {task?.status === "succeeded" && task.final_video_path ? (
+              <Button variant="outline" nativeButton={false} render={<a href={finalVideoDownloadUrl(task.id)} />}>
+                <Download className="size-4" /> {t.task.download}
+              </Button>
+            ) : null}
+          </div>
+        </header>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.task.stages}</CardTitle>
-          </CardHeader>
-          <CardContent>
+        <section className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_360px]">
+          <div className="min-w-0 space-y-5">
+            <Card>
+              <CardHeader className="flex-row items-center justify-between border-b border-border pb-4">
+                <CardTitle className="flex items-center gap-2"><Film className="size-4 text-primary" /> {t.task.finalVideo}</CardTitle>
+                <span className="flex items-center gap-2 text-xs text-muted-foreground"><span className="size-1.5 rounded-full bg-emerald-500" /> Monitor</span>
+              </CardHeader>
+              <CardContent className="pt-0">
+                {task?.status === "succeeded" && task.final_video_path ? (
+                  <div className="overflow-hidden rounded-xl border border-border bg-black shadow-inner">
+                    <video key={task.id} src={finalVideoUrl(task.id)} crossOrigin="use-credentials" controls preload="metadata" className="aspect-video w-full bg-black object-contain" />
+                  </div>
+                ) : (
+                  <div className="flex aspect-video items-center justify-center rounded-xl border border-border bg-[radial-gradient(circle_at_center,#ffffff_0%,#ececf0_75%)]">
+                    <div className="text-center">
+                      {isRunning || isQueued ? <Loader2 className="mx-auto size-8 animate-spin text-primary" /> : <Film className="mx-auto size-8 text-black/20" />}
+                      <p className="mt-3 text-sm text-muted-foreground">{task?.current_stage ? stageLabel(task.current_stage) : t.task.loading}</p>
+                      <p className="mt-1 font-mono text-xs text-muted-foreground">{progress}%</p>
+                    </div>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="border-b border-border pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="flex items-center gap-2"><Activity className="size-4 text-primary" /> {t.task.stages}</CardTitle>
+                  <span className="font-mono text-xs text-muted-foreground">{progress}% complete</span>
+                </div>
+                <Progress value={progress} />
+              </CardHeader>
+              <CardContent className="pt-0">
             {isManual && canRedoStage ? (
               <p className="mb-3 text-sm text-muted-foreground">{t.task.redoStageHelp}</p>
             ) : null}
             {redoError ? (
-              <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mb-3 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2 text-sm text-rose-700">
                 {redoError}
               </div>
             ) : null}
             {task ? (
-              <ol className="grid gap-3">
+              <ol className="divide-y divide-border">
                 {task.stages.map((stage, index) => {
                   const stageProgress = normalizeProgress(stage.progress)
                   const showRedo =
@@ -342,16 +346,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                   return (
                     <li
                       key={stage.name}
-                      className="flex items-start gap-3 rounded-lg border border-border bg-background px-4 py-3"
+                      className="group flex items-start gap-3 px-1 py-3.5"
                     >
-                      <div className="mt-0.5">{stageIcon(stage.status)}</div>
+                      <div className="mt-0.5 flex size-7 items-center justify-center rounded-lg border border-border bg-black/[0.025]">{stageIcon(stage.status)}</div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs text-muted-foreground">#{index + 1}</span>
-                          <p className="font-medium">{stageLabel(stage.name, stage.label)}</p>
+                          <span className="font-mono text-[10px] text-muted-foreground">{String(index + 1).padStart(2, "0")}</span>
+                          <p className="font-medium text-foreground/85">{stageLabel(stage.name, stage.label)}</p>
                           <Badge className={statusBadgeClass(stage.status)}>{statusLabel(stage.status)}</Badge>
                           {stage.started_at ? (
-                            <span className="text-xs text-muted-foreground">
+                            <span className="ml-auto text-xs text-muted-foreground">
                               {durationOf(stage.started_at, stage.completed_at)}
                             </span>
                           ) : null}
@@ -372,7 +376,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
                             </Button>
                           ) : null}
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">
                           {stage.error_message || stage.last_message || t.common.waiting}
                         </p>
                         {stage.status === "running" && stageProgress !== null ? (
@@ -391,7 +395,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
             ) : null}
 
             {task?.error_message ? (
-              <div className="mt-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mt-4 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2 text-sm text-rose-700">
                 {task.error_message}
               </div>
             ) : null}
@@ -421,16 +425,16 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </DialogContent>
             </Dialog>
             {isPaused ? (
-              <div className="mt-4 space-y-3 rounded-lg border border-sky-200 bg-sky-50 px-3 py-3">
+              <div className="mt-4 space-y-3 rounded-xl border border-primary/20 bg-primary/[0.06] px-3 py-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-sky-900">{t.task.continueHelp}</p>
+                  <p className="text-sm text-primary/90">{t.task.continueHelp}</p>
                   <Button onClick={() => handleContinue()} disabled={continuing}>
                     {continuing ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
                     {continuing ? t.task.continuing : t.task.continueTask}
                   </Button>
                 </div>
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <p className="text-sm text-sky-900">{t.task.continueAutoHelp}</p>
+                  <p className="text-sm text-primary/90">{t.task.continueAutoHelp}</p>
                   <Button variant="outline" onClick={() => handleContinue("auto")} disabled={continuing}>
                     {continuing ? <Loader2 className="size-4 animate-spin" /> : <Play className="size-4" />}
                     {continuing ? t.task.continuing : t.task.continueAutoTask}
@@ -439,12 +443,12 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             ) : null}
             {continueError ? (
-              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mt-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2 text-sm text-rose-700">
                 {continueError}
               </div>
             ) : null}
             {isFailed ? (
-              <div className="mt-4 flex flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
+              <div className="mt-4 flex flex-col gap-2 rounded-lg border border-amber-500/25 bg-amber-500/10 px-3 py-3 sm:flex-row sm:items-center sm:justify-between">
                 <p className="text-sm text-amber-800">
                   {t.task.resumeHelp}
                 </p>
@@ -455,36 +459,63 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </div>
             ) : null}
             {resumeError ? (
-              <div className="mt-2 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+              <div className="mt-2 rounded-xl border border-rose-500/20 bg-rose-500/[0.07] px-3 py-2 text-sm text-rose-700">
                 {resumeError}
               </div>
             ) : null}
-          </CardContent>
-        </Card>
+              </CardContent>
+            </Card>
+          </div>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>{t.task.runLog}</CardTitle>
-            <FileText className="size-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <ScrollArea className="h-80 rounded-lg border bg-zinc-950 p-3 text-xs text-zinc-100">
-              {log ? (
-                <pre className="whitespace-pre-wrap break-words font-mono">{log}</pre>
-              ) : (
-                <p className="text-zinc-400">{t.task.emptyLog}</p>
-              )}
-            </ScrollArea>
-          </CardContent>
-        </Card>
+          <aside className="space-y-5 xl:sticky xl:top-5 xl:self-start">
+            {task?.status === "awaiting_review" ? (
+              <Card className="border border-amber-500/20 bg-amber-50/90 text-foreground ring-0">
+                <CardContent className="space-y-4 px-5 py-5">
+                  <div className="flex gap-3"><AlertTriangle className="size-5 shrink-0 text-amber-600" /><div><p className="font-medium text-amber-900">{t.task.reviewWorkspace}</p><p className="mt-1 text-xs leading-5 text-amber-800/75">{t.task.awaitingReviewHelp}</p></div></div>
+                  <Button className="w-full bg-amber-500 text-white hover:bg-amber-600" nativeButton={false} render={<Link href={`/tasks/${id}/review`} />}><Languages className="size-4" /> {t.task.reviewWorkspace}</Button>
+                </CardContent>
+              </Card>
+            ) : null}
 
-        <Card className="border-red-200">
-          <CardHeader>
-            <CardTitle className="text-red-700">{t.task.dangerZone}</CardTitle>
-          </CardHeader>
-          <CardContent className="flex flex-col gap-4">
+            {task?.result_stale ? (
+              <Card className="border border-amber-500/20 bg-amber-50/90 text-foreground ring-0">
+                <CardContent className="space-y-4 px-5 py-5">
+                  <div className="flex gap-3"><AlertTriangle className="size-5 shrink-0 text-amber-600" /><div><p className="font-medium text-amber-900">{t.task.staleResultTitle}</p><p className="mt-1 text-xs leading-5 text-amber-800/75">{t.task.staleResultHelp}</p></div></div>
+                  {renderDirtyError ? <p className="text-xs text-rose-700">{renderDirtyError}</p> : null}
+                  <Button className="w-full bg-amber-500 text-white hover:bg-amber-600" type="button" onClick={handleRenderDirty} disabled={renderingDirty}>{renderingDirty ? <Loader2 className="size-4 animate-spin" /> : <RotateCw className="size-4" />}{renderingDirty ? t.task.renderingDirty : t.task.renderDirty}</Button>
+                </CardContent>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader className="border-b border-border pb-4"><CardTitle className="flex items-center gap-2"><Gauge className="size-4 text-primary" /> {t.task.overview}</CardTitle></CardHeader>
+              <CardContent className="pt-0">
+                {task ? <dl className="divide-y divide-border text-xs">
+                  {[
+                    [t.task.executionMode, task.execution_mode === "manual" ? t.task.executionManual : t.task.executionAuto],
+                    [t.task.outputMode, (task.output_mode || "both") === "subtitles" ? t.task.outputSubtitles : (task.output_mode || "both") === "dubbing" ? t.task.outputDubbing : t.task.outputBoth],
+                    [t.task.created, formatTime(task.created_at)],
+                    [t.task.started, formatTime(task.started_at) || "—"],
+                    [t.task.completed, formatTime(task.completed_at) || "—"],
+                  ].map(([label, value]) => <div key={label} className="grid grid-cols-[100px_1fr] gap-3 py-2.5"><dt className="text-muted-foreground">{label}</dt><dd className="text-right text-foreground/75">{value}</dd></div>)}
+                  <div className="py-2.5"><dt className="mb-1 text-muted-foreground">URL</dt><dd><a href={task.url} target="_blank" rel="noreferrer" className="flex items-start gap-1 break-all text-primary hover:text-primary/75"><span className="min-w-0 flex-1">{task.url}</span><ExternalLink className="mt-0.5 size-3 shrink-0" /></a></dd></div>
+                  {task.session_path ? <div className="py-2.5"><dt className="mb-1 text-muted-foreground">{t.task.session}</dt><dd className="break-all font-mono text-[10px] leading-4 text-muted-foreground">{task.session_path}</dd></div> : null}
+                </dl> : <p className="py-4 text-muted-foreground">{t.task.loading}</p>}
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex-row items-center justify-between border-b border-border pb-4"><CardTitle className="flex items-center gap-2"><Terminal className="size-4 text-primary" /> {t.task.runLog}</CardTitle><FileText className="size-4 text-muted-foreground" /></CardHeader>
+              <CardContent className="pt-0"><ScrollArea className="h-72 rounded-xl border border-black/10 bg-[#1d1d1f] p-3 text-[11px] text-zinc-200">{log ? <pre className="whitespace-pre-wrap break-words font-mono leading-5">{log}</pre> : <p className="text-zinc-500">{t.task.emptyLog}</p>}</ScrollArea></CardContent>
+            </Card>
+          </aside>
+        </section>
+
+        <Card className="border border-rose-500/15 bg-rose-50/75 text-foreground ring-0">
+          <CardHeader className="border-b border-rose-500/12 pb-4"><CardTitle className="text-sm text-rose-700">{t.task.dangerZone}</CardTitle></CardHeader>
+          <CardContent className="grid gap-4 pt-0 lg:grid-cols-2">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs leading-5 text-muted-foreground">
                 {t.task.rerunHelp}
               </p>
               <Dialog open={rerunOpen} onOpenChange={setRerunOpen}>
@@ -521,7 +552,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </Dialog>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-              <p className="text-sm text-muted-foreground">
+              <p className="text-xs leading-5 text-muted-foreground">
                 {t.task.deleteHelp} <code className="font-mono text-xs">workfolder/</code>
                 {t.common.sentenceEnd}
               </p>
@@ -559,7 +590,7 @@ export default function TaskDetailPage({ params }: { params: Promise<{ id: strin
               </Dialog>
             </div>
             {isRunning ? (
-              <p className="text-xs text-amber-600">{t.task.runningLocked}</p>
+              <p className="text-xs text-amber-400 lg:col-span-2">{t.task.runningLocked}</p>
             ) : null}
           </CardContent>
         </Card>

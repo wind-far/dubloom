@@ -85,9 +85,12 @@ function requestHeaders(options?: RequestInit) {
 }
 
 export type StageStatus = "pending" | "running" | "succeeded" | "failed" | "skipped"
-export type TaskStatus = "queued" | "running" | "paused" | "succeeded" | "failed"
+export type TaskStatus = "queued" | "running" | "paused" | "awaiting_review" | "succeeded" | "failed"
 export type ExecutionMode = "auto" | "manual"
 export type OutputMode = "subtitles" | "dubbing" | "both"
+export type ReviewMode = "none" | "required"
+export type ProviderKind = "translation" | "tts"
+export type AudioMode = "tts" | "original"
 
 export type TaskStage = {
   task_id: string
@@ -115,7 +118,55 @@ export type Task = {
   completed_at: string | null
   execution_mode: ExecutionMode
   output_mode: OutputMode
+  review_mode?: ReviewMode
+  result_stale?: boolean
+  review_approved_at?: string | null
+  translation_profile_id?: string | null
+  tts_profile_id?: string | null
   stages: TaskStage[]
+}
+
+export type ProviderProfile = {
+  id: string
+  kind: ProviderKind
+  name: string
+  provider: string
+  model: string | null
+  config: Record<string, unknown>
+  has_secrets: boolean
+}
+
+export type TaskSegment = {
+  id: string
+  task_id: string
+  position: number
+  source_text: string
+  translated_text: string
+  start_ms: number
+  end_ms: number
+  speaker: string | null
+  audio_mode: AudioMode
+  tts_profile_id: string | null
+  revision: number
+  dirty: boolean
+  preview_status: "none" | "queued" | "running" | "generating" | "ready" | "failed"
+  preview_path: string | null
+  preview_error?: string | null
+  warnings: Array<string | { code: string; message: string }>
+}
+
+export type Job = {
+  id: string
+  task_id: string
+  job_type: "pipeline" | "segment_preview" | "dirty_render"
+  status: "queued" | "running" | "succeeded" | "failed" | "cancelled"
+  progress: number | null
+  error_message: string | null
+}
+
+export type TaskSegmentsResponse = {
+  segments: TaskSegment[]
+  task: Pick<Task, "id" | "status" | "review_mode" | "review_approved_at" | "result_stale">
 }
 
 export type CookieInfo = {
@@ -202,6 +253,9 @@ export type TaskSummary = {
   completed_at: string | null
   execution_mode?: ExecutionMode
   output_mode?: OutputMode
+  review_mode?: ReviewMode
+  result_stale?: boolean
+  review_approved_at?: string | null
 }
 
 export type TaskListStatus = "all" | TaskStatus
@@ -296,10 +350,20 @@ export function createTask(
   url: string,
   executionMode: ExecutionMode = "auto",
   outputMode: OutputMode = "both",
+  reviewMode: ReviewMode = "none",
+  translationProfileId?: string,
+  ttsProfileId?: string,
 ) {
   return request<Task>("/api/tasks", {
     method: "POST",
-    body: JSON.stringify({ url, execution_mode: executionMode, output_mode: outputMode }),
+    body: JSON.stringify({
+      url,
+      execution_mode: executionMode,
+      output_mode: outputMode,
+      review_mode: reviewMode,
+      translation_profile_id: translationProfileId || null,
+      tts_profile_id: ttsProfileId || null,
+    }),
   })
 }
 
@@ -309,6 +373,9 @@ export async function uploadLocalTask(
   subtitleFile: File | null = null,
   executionMode: ExecutionMode = "auto",
   outputMode: OutputMode = "both",
+  reviewMode: ReviewMode = "none",
+  translationProfileId?: string,
+  ttsProfileId?: string,
 ) {
   const form = new FormData()
   form.append("direction", direction)
@@ -318,6 +385,9 @@ export async function uploadLocalTask(
   }
   form.append("execution_mode", executionMode)
   form.append("output_mode", outputMode)
+  form.append("review_mode", reviewMode)
+  if (translationProfileId) form.append("translation_profile_id", translationProfileId)
+  if (ttsProfileId) form.append("tts_profile_id", ttsProfileId)
 
   const options: RequestInit = {
     method: "POST",
@@ -387,4 +457,76 @@ export function finalVideoUrl(taskId: string) {
 
 export function finalVideoDownloadUrl(taskId: string) {
   return `/api/tasks/${taskId}/artifact/final-video?download=1`
+}
+
+export function sourceVideoUrl(taskId: string) {
+  return `/api/tasks/${taskId}/artifact/source-video`
+}
+
+export function listProviderProfiles(kind?: ProviderKind, signal?: AbortSignal) {
+  const query = kind ? `?kind=${encodeURIComponent(kind)}` : ""
+  return request<ProviderProfile[]>(
+    `/api/provider-profiles${query}`,
+    signal ? { signal } : undefined,
+  )
+}
+
+export function createProviderProfile(profile: Omit<ProviderProfile, "id" | "has_secrets"> & { secrets?: Record<string, string> }) {
+  return request<ProviderProfile>("/api/provider-profiles", {
+    method: "POST",
+    body: JSON.stringify(profile),
+  })
+}
+
+export function updateProviderProfile(
+  profileId: string,
+  profile: Partial<Omit<ProviderProfile, "id" | "has_secrets">> & { secrets?: Record<string, string> },
+) {
+  return request<ProviderProfile>(`/api/provider-profiles/${profileId}`, {
+    method: "PATCH",
+    body: JSON.stringify(profile),
+  })
+}
+
+export function deleteProviderProfile(profileId: string) {
+  return request<void>(`/api/provider-profiles/${profileId}`, { method: "DELETE" })
+}
+
+export function listTaskSegments(taskId: string, signal?: AbortSignal) {
+  return request<TaskSegmentsResponse>(
+    `/api/tasks/${taskId}/segments`,
+    signal ? { signal } : undefined,
+  )
+}
+
+export type SegmentUpdate = Pick<
+  TaskSegment,
+  "translated_text" | "start_ms" | "end_ms" | "speaker" | "audio_mode" | "tts_profile_id"
+> & { expected_revision: number }
+
+export function updateTaskSegment(taskId: string, segmentId: string, update: SegmentUpdate) {
+  return request<TaskSegment>(`/api/tasks/${taskId}/segments/${segmentId}`, {
+    method: "PATCH",
+    body: JSON.stringify(update),
+  })
+}
+
+export function createSegmentPreview(taskId: string, segmentId: string) {
+  return request<Job>(`/api/tasks/${taskId}/segments/${segmentId}/preview`, { method: "POST" })
+}
+
+export function segmentAudioUrl(taskId: string, segmentId: string, kind: "source" | "preview") {
+  return `/api/tasks/${taskId}/segments/${segmentId}/audio?kind=${kind}`
+}
+
+export function approveTaskReview(taskId: string) {
+  return request<Task & { job_id?: string }>(`/api/tasks/${taskId}/review/approve`, { method: "POST" })
+}
+
+export function renderDirtySegments(taskId: string) {
+  return request<Job | (Task & { job_id: string })>(`/api/tasks/${taskId}/render-dirty`, { method: "POST" })
+}
+
+export function getJob(jobId: string, signal?: AbortSignal) {
+  return request<Job>(`/api/jobs/${jobId}`, signal ? { signal } : undefined)
 }

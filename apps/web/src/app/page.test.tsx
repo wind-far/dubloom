@@ -199,6 +199,7 @@ describe("任务输出选择", () => {
     expect(JSON.parse(String(createCall?.[1]?.body))).toMatchObject({
       execution_mode: "auto",
       output_mode: "subtitles",
+      review_mode: "required",
     })
   })
 })
@@ -544,15 +545,16 @@ describe("任务搜索校验错误", () => {
     })
     vi.stubGlobal("fetch", mocks.fetch)
 
-    const user = userEvent.setup()
     render(
       <LanguageProvider>
         <Home />
       </LanguageProvider>,
     )
     await waitFor(() => expect(mocks.fetch).toHaveBeenCalledTimes(1))
-    await user.type(screen.getByLabelText(/YouTube 链接/), "https://www.youtube.com/watch?v=testvideo01")
-    await user.click(screen.getByRole("button", { name: "创建任务" }))
+    fireEvent.change(screen.getByLabelText(/YouTube 链接/), {
+      target: { value: "https://www.youtube.com/watch?v=testvideo01" },
+    })
+    fireEvent.click(screen.getByRole("button", { name: "创建任务" }))
     expect(await screen.findByText("创建任务失败")).toBeInTheDocument()
 
     fireEvent.change(screen.getByPlaceholderText("搜索标题、链接或任务 ID"), {

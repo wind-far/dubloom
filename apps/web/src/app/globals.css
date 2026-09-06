@@ -47,62 +47,151 @@
 }
 
 :root {
-  --background: oklch(1 0 0);
-  --foreground: oklch(0.145 0 0);
-  --card: oklch(1 0 0);
-  --card-foreground: oklch(0.145 0 0);
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  --primary: #ff0033;
+  color-scheme: light;
+  --background: #f5f5f7;
+  --foreground: #1d1d1f;
+  --card: rgba(255, 255, 255, 0.84);
+  --card-foreground: #1d1d1f;
+  --popover: rgba(255, 255, 255, 0.96);
+  --popover-foreground: #1d1d1f;
+  --primary: #007aff;
   --primary-foreground: #ffffff;
-  --secondary: #e5f8ff;
-  --secondary-foreground: #006f99;
-  --muted: #f5f7fb;
-  --muted-foreground: #5d6673;
-  --accent: #ffe8f0;
-  --accent-foreground: #a90038;
-  --destructive: #ff0033;
-  --border: #e5e9f2;
-  --input: #d9e1ee;
-  --ring: #00aeec;
-  --chart-1: #ff0033;
-  --chart-2: #00aeec;
-  --chart-3: #fb7299;
-  --chart-4: #006f99;
-  --chart-5: #a90038;
-  --radius: 0.5rem;
-  --sidebar: oklch(0.985 0 0);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: #ff0033;
+  --secondary: #ececf0;
+  --secondary-foreground: #303035;
+  --muted: #f0f0f3;
+  --muted-foreground: #6e6e73;
+  --accent: #e8f2ff;
+  --accent-foreground: #0057b8;
+  --destructive: #d70015;
+  --border: rgba(60, 60, 67, 0.16);
+  --input: rgba(60, 60, 67, 0.22);
+  --ring: #007aff;
+  --chart-1: #007aff;
+  --chart-2: #34c759;
+  --chart-3: #ff9f0a;
+  --chart-4: #af52de;
+  --chart-5: #64d2ff;
+  --radius: 0.75rem;
+  --sidebar: rgba(246, 246, 248, 0.78);
+  --sidebar-foreground: #1d1d1f;
+  --sidebar-primary: #007aff;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #e5f8ff;
-  --sidebar-accent-foreground: #006f99;
-  --sidebar-border: #e5e9f2;
-  --sidebar-ring: #00aeec;
+  --sidebar-accent: rgba(0, 122, 255, 0.1);
+  --sidebar-accent-foreground: #0057b8;
+  --sidebar-border: rgba(60, 60, 67, 0.12);
+  --sidebar-ring: #007aff;
+  --surface-raised: rgba(255, 255, 255, 0.9);
+  --surface-sunken: #ececf0;
+  --hairline: rgba(60, 60, 67, 0.14);
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.04), 0 12px 36px rgba(0, 0, 0, 0.07);
 }
 
 @layer base {
   * {
     @apply border-border outline-ring/50;
   }
-  body {
-    @apply bg-background text-foreground;
-  }
+
   html {
-    @apply font-sans;
+    @apply bg-background font-sans;
     overflow-y: scroll;
-    scrollbar-color: #cbd5e1 #f8fafc;
+    scrollbar-color: rgba(60, 60, 67, 0.3) transparent;
     scrollbar-gutter: stable;
   }
+
+  body {
+    @apply bg-background text-foreground antialiased;
+    min-width: 320px;
+    background-image:
+      radial-gradient(circle at 72% -10rem, rgba(0, 122, 255, 0.09), transparent 34rem),
+      linear-gradient(180deg, #fafafd 0%, #f5f5f7 45%, #f1f1f4 100%);
+    background-attachment: fixed;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro Display", var(--font-sans), "PingFang SC", sans-serif;
+    text-rendering: optimizeLegibility;
+  }
+
+  main {
+    background-color: transparent !important;
+    background-image: none !important;
+  }
+
+  ::selection {
+    color: var(--primary-foreground);
+    background: var(--primary);
+  }
+
+  :focus-visible {
+    scroll-margin: 5rem;
+  }
+
   ::-webkit-scrollbar {
-    width: 12px;
+    width: 10px;
+    height: 10px;
   }
+
   ::-webkit-scrollbar-track {
-    background: #f8fafc;
+    background: transparent;
   }
+
   ::-webkit-scrollbar-thumb {
-    background: #cbd5e1;
-    border: 3px solid #f8fafc;
+    background: rgba(60, 60, 67, 0.28);
+    border: 2px solid transparent;
+    background-clip: padding-box;
     border-radius: 999px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(60, 60, 67, 0.42);
+    background-clip: padding-box;
+  }
+
+  input:-webkit-autofill,
+  input:-webkit-autofill:hover,
+  input:-webkit-autofill:focus {
+    -webkit-text-fill-color: var(--foreground);
+    box-shadow: 0 0 0 1000px #ffffff inset;
+    caret-color: var(--foreground);
+    transition: background-color 9999s ease-out;
+  }
+}
+
+@layer components {
+  .workspace-panel {
+    border: 1px solid var(--hairline);
+    background: var(--card);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .workspace-overline {
+    color: var(--muted-foreground);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+
+  .apple-material {
+    border: 1px solid var(--hairline);
+    background: rgba(255, 255, 255, 0.78);
+    -webkit-backdrop-filter: saturate(180%) blur(24px);
+    backdrop-filter: saturate(180%) blur(24px);
+    box-shadow: var(--shadow-panel);
+  }
+
+  .apple-inset {
+    border: 1px solid rgba(60, 60, 67, 0.12);
+    background: rgba(118, 118, 128, 0.06);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
   }
 }

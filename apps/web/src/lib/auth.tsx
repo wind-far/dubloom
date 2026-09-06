@@ -106,7 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   if (status === "error") {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#fff5f5_0%,#f2fbff_48%,#fff4fa_100%)] px-4">
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_50%_14%,rgba(0,122,255,0.12),transparent_28rem)] px-4">
         <Card className="w-full max-w-md">
           <CardContent className="space-y-4 px-6 py-8 text-center">
             <p className="text-sm text-red-700">{sessionError || t.auth.sessionError}</p>
@@ -126,7 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   if (redirecting) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#fff5f5_0%,#f2fbff_48%,#fff4fa_100%)] px-4">
+      <main className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_50%_14%,rgba(0,122,255,0.12),transparent_28rem)] px-4">
         <p className="text-sm text-muted-foreground">{t.auth.sessionLoading}</p>
       </main>
     )

@@ -25,32 +25,43 @@ export function AppHeader({ backHref }: { backHref?: string }) {
   }
 
   return (
-    <header className="flex flex-col gap-4 border-b border-[#00aeec]/25 pb-5 sm:flex-row sm:items-center sm:justify-between">
-      <div className="flex items-center gap-3">
+    <header className="flex flex-col gap-4 border-b border-border/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+      <div className="flex min-w-0 items-center gap-2.5">
         {backHref ? (
           <Button
             variant="ghost"
             size="icon-sm"
+            className="-ml-1 border border-transparent hover:border-border"
             nativeButton={false}
             render={<Link href={backHref} aria-label={t.common.back} />}
           >
             <ArrowLeft className="size-4" />
           </Button>
         ) : null}
-        <Link href="/" className="flex items-center">
+        <Link
+          href="/"
+          className="flex min-w-0 items-center gap-3 rounded-sm outline-none focus-visible:ring-2 focus-visible:ring-ring/35"
+        >
+          <span aria-hidden="true" className="h-5 w-px bg-border" />
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src="/youdub-logo.svg"
-            alt="YouDub"
-            className="h-9 w-auto sm:h-11"
+            alt="Dubloom · 织声"
+            className="h-6 w-auto sm:h-7"
           />
         </Link>
       </div>
-      <div className="flex items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5">
         <SettingsDialog />
-        <Button type="button" variant="outline" onClick={handleLogout} disabled={loggingOut}>
+        <Button
+          type="button"
+          variant="ghost"
+          className="border border-transparent hover:border-border"
+          onClick={handleLogout}
+          disabled={loggingOut}
+        >
           {loggingOut ? <Loader2 className="size-4 animate-spin" /> : <LogOut className="size-4" />}
-          {loggingOut ? t.auth.loggingOut : t.auth.logout}
+          <span className="hidden sm:inline">{loggingOut ? t.auth.loggingOut : t.auth.logout}</span>
         </Button>
       </div>
     </header>

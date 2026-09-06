@@ -19,7 +19,7 @@ function SelectTrigger({
     <SelectPrimitive.Trigger
       data-slot="select-trigger"
       className={cn(
-        "flex h-8 w-full items-center justify-between gap-2 rounded-lg border border-input bg-transparent px-2.5 py-1 text-sm transition-colors outline-none focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-input/50 disabled:opacity-50 data-placeholder:text-muted-foreground",
+        "flex h-9 w-full items-center justify-between gap-2 rounded-lg border border-input bg-white/82 px-3 py-1 text-sm shadow-[inset_0_1px_2px_rgba(0,0,0,0.035)] transition-[background-color,border-color,box-shadow] outline-none hover:border-black/25 focus-visible:border-ring focus-visible:bg-white focus-visible:ring-3 focus-visible:ring-ring/16 disabled:pointer-events-none disabled:cursor-not-allowed disabled:bg-muted disabled:opacity-50 data-placeholder:text-muted-foreground",
         className
       )}
       {...props}
@@ -47,7 +47,7 @@ function SelectContent({
         <SelectPrimitive.Popup
           data-slot="select-content"
           className={cn(
-            "max-h-72 min-w-64 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-lg outline-none",
+            "max-h-72 min-w-64 overflow-hidden rounded-xl border border-border bg-popover p-1 text-popover-foreground shadow-[0_20px_60px_rgba(0,0,0,0.18)] backdrop-blur-2xl outline-none",
             className
           )}
           {...props}
@@ -68,7 +68,7 @@ function SelectItem({
     <SelectPrimitive.Item
       data-slot="select-item"
       className={cn(
-        "relative flex cursor-default items-center rounded-md py-1.5 pr-2 pl-8 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground",
+        "relative flex cursor-default items-center rounded-lg py-1.5 pr-2 pl-8 text-sm outline-none select-none data-disabled:pointer-events-none data-disabled:opacity-50 data-highlighted:bg-accent data-highlighted:text-accent-foreground",
         className
       )}
       {...props}

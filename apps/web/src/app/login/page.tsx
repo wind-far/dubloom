@@ -2,7 +2,7 @@
 
 import Link from "next/link"
 import { FormEvent, useState } from "react"
-import { Loader2, LogIn } from "lucide-react"
+import { Loader2, LockKeyhole, LogIn } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
@@ -14,7 +14,7 @@ import { useI18n } from "@/lib/i18n"
 
 export default function LoginPage() {
   const { login } = useAuth()
-  const { t } = useI18n()
+  const { language, t } = useI18n()
   const [password, setPassword] = useState("")
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState("")
@@ -39,18 +39,32 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[linear-gradient(135deg,#fff5f5_0%,#f2fbff_48%,#fff4fa_100%)] px-4 py-8">
-      <div className="w-full max-w-sm space-y-6">
-        <Link href="/login" className="flex justify-center" aria-label="YouDub">
+    <main className="relative isolate flex min-h-screen items-center justify-center overflow-hidden px-4 py-10">
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_50%_14%,rgba(0,122,255,0.12),transparent_28rem)]"
+      />
+      <div className="w-full max-w-[22rem]">
+        <Link
+          href="/login"
+          className="mx-auto mb-8 flex w-fit rounded-xl outline-none focus-visible:ring-3 focus-visible:ring-ring/20"
+          aria-label="Dubloom · 织声"
+        >
           {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/youdub-logo.svg" alt="YouDub" className="h-12 w-auto" />
+          <img src="/youdub-logo.svg" alt="Dubloom · 织声" className="h-9 w-auto" />
         </Link>
-        <Card>
-          <CardHeader>
-            <CardTitle>{t.auth.title}</CardTitle>
+        <Card className="workspace-panel relative overflow-visible rounded-3xl py-0">
+          <CardHeader className="border-b border-border/70 px-5 py-5">
+            <div className="mb-3 flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <LockKeyhole className="size-4" />
+            </div>
+            <p className="workspace-overline">Dubloom workspace</p>
+            <CardTitle className="text-base">
+              {language === "zh" ? "登录织声" : "Sign in to Dubloom"}
+            </CardTitle>
           </CardHeader>
-          <CardContent>
-            <form onSubmit={submit} className="space-y-4">
+          <CardContent className="px-5 py-5">
+            <form onSubmit={submit} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="password">{t.auth.password}</Label>
                 <Input
@@ -66,11 +80,11 @@ export default function LoginPage() {
                 />
               </div>
               {error ? (
-                <p className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700" role="alert">
+                <p className="rounded-md border border-destructive/25 bg-destructive/8 px-3 py-2 text-sm text-destructive" role="alert">
                   {error}
                 </p>
               ) : null}
-              <Button type="submit" className="w-full" disabled={submitting || !password}>
+              <Button type="submit" size="lg" className="w-full" disabled={submitting || !password}>
                 {submitting ? <Loader2 className="size-4 animate-spin" /> : <LogIn className="size-4" />}
                 {submitting ? t.auth.signingIn : t.auth.signIn}
               </Button>

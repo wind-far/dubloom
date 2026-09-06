@@ -1,7 +1,7 @@
 "use client"
 
 import { FormEvent, useEffect, useState } from "react"
-import { Eye, EyeOff, RefreshCw, Settings } from "lucide-react"
+import { Cookie, Cpu, Eye, EyeOff, Globe2, KeyRound, Network, RefreshCw, Settings, ShieldCheck } from "lucide-react"
 
 import {
   ApiError,
@@ -239,205 +239,168 @@ export function SettingsDialog() {
     return `${t.settings.saveFailed}${result.httpStatus ? ` (HTTP ${result.httpStatus})` : ""}`
   }
 
+  const fieldClass = "border-input bg-white/86 text-foreground placeholder:text-muted-foreground focus-visible:border-primary focus-visible:ring-primary/15"
+  const selectContentClass = "border-border bg-white/96 text-foreground shadow-xl backdrop-blur-2xl"
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger render={<Button variant="outline" />}>
         <Settings className="size-4" />
         {t.settings.button}
       </DialogTrigger>
-      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-hidden sm:max-w-2xl">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] overflow-hidden border border-border bg-white/92 p-0 text-foreground ring-0 shadow-[0_28px_90px_rgba(0,0,0,0.2)] backdrop-blur-2xl sm:max-w-3xl [&_[data-slot=dialog-close]]:text-muted-foreground [&_[data-slot=dialog-close]:hover]:bg-black/5 [&_[data-slot=dialog-close]:hover]:text-foreground">
         <form onSubmit={submit} className="flex max-h-[calc(100dvh-4rem)] min-h-0 flex-col">
-          <DialogHeader className="shrink-0 pr-8">
-            <DialogTitle>{t.settings.title}</DialogTitle>
-            <DialogDescription>{t.settings.description}</DialogDescription>
+          <DialogHeader className="shrink-0 border-b border-border bg-white/68 px-5 py-4 pr-12">
+            <div className="flex items-center gap-3">
+              <span className="flex size-9 items-center justify-center rounded-lg border border-primary/15 bg-primary/8 text-primary">
+                <Settings className="size-4" />
+              </span>
+              <div>
+                <DialogTitle className="text-lg font-semibold text-foreground">{t.settings.title}</DialogTitle>
+                <DialogDescription className="mt-1 text-xs text-muted-foreground">{t.settings.description}</DialogDescription>
+              </div>
+            </div>
           </DialogHeader>
-          <div className="mt-4 min-h-0 overflow-y-auto pr-1">
-            <div className="grid gap-4 pb-4">
-              <div className="grid gap-2">
-                <Label htmlFor="uiLanguage">{t.settings.language}</Label>
-                <Select
-                  value={language}
-                  onValueChange={(value) => {
-                    if (value === "en" || value === "zh") setLanguage(value)
-                  }}
-                >
-                  <SelectTrigger id="uiLanguage">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {LANGUAGE_OPTIONS.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="cookie">{t.settings.cookie}</Label>
-                <Textarea
-                  id="cookie"
-                  value={cookieValue}
-                  onFocus={(event) => {
-                    if (!cookieDirty && settings.cookie === SAVED_COOKIE_SENTINEL) {
-                      event.currentTarget.select()
-                    }
-                  }}
-                  onChange={(event) => {
-                    setCookieDirty(true)
-                    setSettings((current) => ({
-                      ...current,
-                      cookie:
-                        current.cookie === SAVED_COOKIE_SENTINEL
-                          ? event.target.value.replace(t.settings.savedCookie, "")
-                          : event.target.value,
-                    }))
-                  }}
-                  placeholder={t.settings.cookiePlaceholder}
-                  className="min-h-44 max-h-[42dvh] overflow-auto font-mono text-xs leading-relaxed"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="proxyPort">{t.settings.proxyPort}</Label>
-                <Input
-                  id="proxyPort"
-                  inputMode="numeric"
-                  value={settings.proxyPort}
-                  onChange={(event) =>
-                    setSettings((current) => ({ ...current, proxyPort: event.target.value }))
-                  }
-                  placeholder="7890"
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="baseUrl">{t.settings.baseUrl}</Label>
-                <Input
-                  id="baseUrl"
-                  value={settings.baseUrl}
-                  onChange={(event) =>
-                    setSettings((current) => ({ ...current, baseUrl: event.target.value }))
-                  }
-                />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="apiKey">{t.settings.apiKey}</Label>
-                <div className="relative">
-                  <Input
-                    id="apiKey"
-                    type={showApiKey ? "text" : "password"}
-                    value={settings.apiKey}
-                    onFocus={(event) => {
-                      if (!apiKeyDirty && settings.apiKey === SAVED_API_KEY_MASK) {
-                        event.currentTarget.select()
-                      }
-                    }}
-                    onChange={(event) => {
-                      setApiKeyDirty(true)
-                      setSettings((current) => ({
-                        ...current,
-                        apiKey: event.target.value.replace(SAVED_API_KEY_MASK, ""),
-                      }))
-                    }}
-                    placeholder={t.settings.apiKeyPlaceholder}
-                    className="pr-9"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="absolute top-0.5 right-0.5"
-                    onClick={() => setShowApiKey((current) => !current)}
-                  >
-                    {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    <span className="sr-only">{showApiKey ? t.settings.hideApiKey : t.settings.showApiKey}</span>
-                  </Button>
-                </div>
-              </div>
-              <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
-                <div className="grid gap-2">
-                  <Label htmlFor="model">{t.settings.model}</Label>
-                  {modelsLoaded && modelOptions.length > 0 ? (
-                    <Select
-                      value={settings.model}
-                      onValueChange={(value) =>
-                        setSettings((current) => ({ ...current, model: value || "" }))
-                      }
-                    >
-                      <SelectTrigger id="model">
-                        <SelectValue placeholder={t.settings.selectModel} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {modelOptions.map((model) => (
-                          <SelectItem key={model} value={model}>
-                            {model}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  ) : (
-                    <Input
-                      id="model"
-                      value={settings.model}
-                      onChange={(event) =>
-                        setSettings((current) => ({ ...current, model: event.target.value }))
-                      }
+          <div className="min-h-0 overflow-y-auto p-4 sm:p-5">
+            <div className="grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+              <div className="space-y-4">
+                <section className="rounded-2xl border border-border bg-black/[0.025] p-4">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Globe2 className="size-4 text-primary" />
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                      {language === "zh" ? "界面与网络" : "Interface & network"}
+                    </h3>
+                  </div>
+                  <div className="grid gap-4">
+                    <div className="grid gap-2">
+                      <Label htmlFor="uiLanguage">{t.settings.language}</Label>
+                      <Select value={language} onValueChange={(value) => { if (value === "en" || value === "zh") setLanguage(value) }}>
+                        <SelectTrigger id="uiLanguage" className={fieldClass}><SelectValue /></SelectTrigger>
+                        <SelectContent className={selectContentClass}>
+                          {LANGUAGE_OPTIONS.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid gap-2">
+                      <Label htmlFor="proxyPort">{t.settings.proxyPort}</Label>
+                      <div className="relative">
+                        <Network className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                        <Input id="proxyPort" inputMode="numeric" value={settings.proxyPort} onChange={(event) => setSettings((current) => ({ ...current, proxyPort: event.target.value }))} placeholder="7890" className={`${fieldClass} pl-8`} />
+                      </div>
+                    </div>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-black/[0.025] p-4">
+                  <div className="mb-4 flex items-center gap-2">
+                    <Cookie className="size-4 text-primary" />
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">YouTube access</h3>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="cookie">{t.settings.cookie}</Label>
+                    <Textarea
+                      id="cookie"
+                      value={cookieValue}
+                      onFocus={(event) => { if (!cookieDirty && settings.cookie === SAVED_COOKIE_SENTINEL) event.currentTarget.select() }}
+                      onChange={(event) => {
+                        setCookieDirty(true)
+                        setSettings((current) => ({
+                          ...current,
+                          cookie: current.cookie === SAVED_COOKIE_SENTINEL ? event.target.value.replace(t.settings.savedCookie, "") : event.target.value,
+                        }))
+                      }}
+                      placeholder={t.settings.cookiePlaceholder}
+                      className={`min-h-40 max-h-[34dvh] overflow-auto font-mono text-xs leading-relaxed ${fieldClass}`}
                     />
-                  )}
-                </div>
-                <div className="grid gap-2 sm:self-end">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={fetchModels}
-                    disabled={modelsLoading || !settings.baseUrl.trim()}
-                  >
-                    <RefreshCw className="size-4" />
-                    {modelsLoading ? t.settings.loading : t.settings.getModels}
-                  </Button>
-                </div>
+                    <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                      <ShieldCheck className="size-3.5" />
+                      {language === "zh" ? "凭据仅保存在本地后端" : "Credentials stay in the local backend"}
+                    </p>
+                  </div>
+                </section>
               </div>
-              <div className="grid gap-2">
-                <Label htmlFor="translateConcurrency">{t.settings.translateConcurrency}</Label>
-                <Input
-                  id="translateConcurrency"
-                  inputMode="numeric"
-                  value={settings.translateConcurrency}
-                  onChange={(event) =>
-                    setSettings((current) => ({
-                      ...current,
-                      translateConcurrency: event.target.value.replace(/[^0-9]/g, ""),
-                    }))
-                  }
-                  placeholder="50"
-                />
-                <p className="text-xs text-muted-foreground">
-                  {t.settings.concurrencyHelp}
-                </p>
-              </div>
+
+              <section className="rounded-2xl border border-border bg-black/[0.025] p-4">
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-2">
+                    <Cpu className="size-4 text-primary" />
+                    <h3 className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">OpenAI compatible</h3>
+                  </div>
+                  <span className="rounded-full border border-emerald-600/15 bg-emerald-500/10 px-2 py-1 text-[10px] font-medium text-emerald-700">
+                    {settings.apiKey ? (language === "zh" ? "已配置" : "Configured") : (language === "zh" ? "待配置" : "Not configured")}
+                  </span>
+                </div>
+                <div className="grid gap-4">
+                  <div className="grid gap-2">
+                    <Label htmlFor="baseUrl">{t.settings.baseUrl}</Label>
+                    <Input id="baseUrl" value={settings.baseUrl} onChange={(event) => setSettings((current) => ({ ...current, baseUrl: event.target.value }))} className={fieldClass} />
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="apiKey">{t.settings.apiKey}</Label>
+                    <div className="relative">
+                      <KeyRound className="pointer-events-none absolute left-2.5 top-2.5 size-3.5 text-muted-foreground" />
+                      <Input
+                        id="apiKey"
+                        type={showApiKey ? "text" : "password"}
+                        value={settings.apiKey}
+                        onFocus={(event) => { if (!apiKeyDirty && settings.apiKey === SAVED_API_KEY_MASK) event.currentTarget.select() }}
+                        onChange={(event) => {
+                          setApiKeyDirty(true)
+                          setSettings((current) => ({ ...current, apiKey: event.target.value.replace(SAVED_API_KEY_MASK, "") }))
+                        }}
+                        placeholder={t.settings.apiKeyPlaceholder}
+                        className={`${fieldClass} pr-9 pl-8`}
+                      />
+                      <Button type="button" variant="ghost" size="icon-sm" className="absolute top-1 right-1 text-muted-foreground hover:bg-black/5 hover:text-foreground" onClick={() => setShowApiKey((current) => !current)}>
+                        {showApiKey ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        <span className="sr-only">{showApiKey ? t.settings.hideApiKey : t.settings.showApiKey}</span>
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2 sm:grid-cols-[1fr_auto]">
+                    <div className="grid gap-2">
+                      <Label htmlFor="model">{t.settings.model}</Label>
+                      {modelsLoaded && modelOptions.length > 0 ? (
+                        <Select value={settings.model} onValueChange={(value) => setSettings((current) => ({ ...current, model: value || "" }))}>
+                          <SelectTrigger id="model" className={fieldClass}><SelectValue placeholder={t.settings.selectModel} /></SelectTrigger>
+                          <SelectContent className={selectContentClass}>{modelOptions.map((model) => <SelectItem key={model} value={model}>{model}</SelectItem>)}</SelectContent>
+                        </Select>
+                      ) : (
+                        <Input id="model" value={settings.model} onChange={(event) => setSettings((current) => ({ ...current, model: event.target.value }))} className={fieldClass} />
+                      )}
+                    </div>
+                    <div className="grid gap-2 sm:self-end">
+                      <Button type="button" variant="outline" onClick={fetchModels} disabled={modelsLoading || !settings.baseUrl.trim()}>
+                        <RefreshCw className={`size-4 ${modelsLoading ? "animate-spin" : ""}`} />
+                        {modelsLoading ? t.settings.loading : t.settings.getModels}
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label htmlFor="translateConcurrency">{t.settings.translateConcurrency}</Label>
+                    <Input id="translateConcurrency" inputMode="numeric" value={settings.translateConcurrency} onChange={(event) => setSettings((current) => ({ ...current, translateConcurrency: event.target.value.replace(/[^0-9]/g, "") }))} placeholder="50" className={fieldClass} />
+                    <p className="text-xs leading-relaxed text-muted-foreground">{t.settings.concurrencyHelp}</p>
+                  </div>
+                </div>
+              </section>
+
               {saveResults.length > 0 ? (
-                <div
-                  data-testid="settings-save-results"
-                  className="rounded-lg border border-border/60 bg-muted/30 px-3 py-2 text-sm"
-                  aria-live="polite"
-                >
-                  <p className="font-medium">{t.settings.saveResultsTitle}</p>
+                <div data-testid="settings-save-results" className="rounded-2xl border border-border bg-black/[0.025] px-4 py-3 text-sm lg:col-span-2" aria-live="polite">
+                  <p className="font-medium text-foreground">{t.settings.saveResultsTitle}</p>
                   <ul className="mt-1 space-y-1">
                     {saveResults.map((result) => (
-                      <li
-                        key={result.section}
-                        className={result.status === "failed" ? "text-red-700" : "text-muted-foreground"}
-                      >
+                      <li key={result.section} className={result.status === "failed" ? "text-red-700" : "text-muted-foreground"}>
                         {saveSectionLabels[result.section]}: {saveResultText(result)}
                       </li>
                     ))}
                   </ul>
                 </div>
               ) : null}
-              {visibleMessage ? <p className="text-sm text-muted-foreground">{visibleMessage}</p> : null}
+              {visibleMessage ? <p className="text-sm text-muted-foreground lg:col-span-2">{visibleMessage}</p> : null}
             </div>
           </div>
-          <DialogFooter className="shrink-0">
-            <Button type="submit" disabled={saving}>
+          <DialogFooter className="mx-0 mb-0 shrink-0 rounded-none rounded-b-2xl border-border bg-white/68 px-5 py-3">
+            <Button type="submit" className="px-4" disabled={saving}>
               {saving ? t.settings.saving : t.settings.save}
             </Button>
           </DialogFooter>

@@ -6,7 +6,7 @@ import os
 import re
 import shutil
 from pathlib import Path
-from typing import Callable
+from typing import Any, Callable, Mapping
 
 import soundfile as sf
 from pydub import AudioSegment
@@ -172,6 +172,7 @@ def generate_tts(
     progress_callback: Callable[[int, str], None] | None = None,
     *,
     original_vocals_file: Path | None = None,
+    settings: Mapping[str, Any] | None = None,
 ) -> Path:
     output_dir = session / "segments" / "tts"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -198,10 +199,23 @@ def generate_tts(
         return output_dir
 
     model = _load_model()
-    min_reference_ms = int(os.getenv("VOXCPM_MIN_REFERENCE_MS", "1200"))
+    runtime = dict(settings or {})
+    min_reference_ms = int(
+        runtime.get("min_reference_ms")
+        or runtime.get("VOXCPM_MIN_REFERENCE_MS")
+        or os.getenv("VOXCPM_MIN_REFERENCE_MS", "1200")
+    )
     fallback_references, global_fallback = _fallback_references(vocals_dir, items, min_reference_ms)
-    cfg_value = float(os.getenv("VOXCPM_CFG_VALUE", "2.0"))
-    inference_timesteps = int(os.getenv("VOXCPM_INFERENCE_TIMESTEPS", "10"))
+    cfg_value = float(
+        runtime.get("cfg_value")
+        or runtime.get("VOXCPM_CFG_VALUE")
+        or os.getenv("VOXCPM_CFG_VALUE", "2.0")
+    )
+    inference_timesteps = int(
+        runtime.get("inference_timesteps")
+        or runtime.get("VOXCPM_INFERENCE_TIMESTEPS")
+        or os.getenv("VOXCPM_INFERENCE_TIMESTEPS", "10")
+    )
 
     fallback_caches = {}
 

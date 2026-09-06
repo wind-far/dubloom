@@ -114,6 +114,22 @@ class PipelineRunner:
                     self._skip_stage(stage.name, output_mode)
                     continue
                 self._run_stage(stage.name)
+                if stage.name == "translate":
+                    refreshed = database.get_task(self.task_id) or task
+                    if (
+                        (refreshed.get("review_mode") or database.DEFAULT_REVIEW_MODE)
+                        == "required"
+                        and not refreshed.get("review_approved_at")
+                    ):
+                        database.update_task(
+                            self.task_id,
+                            status="awaiting_review",
+                            current_stage="translate",
+                            completed_at=None,
+                            error_message=None,
+                        )
+                        self.log("Translation is ready; waiting for review approval")
+                        return
                 if execution_mode == "manual" and stage != STAGES[-1]:
                     database.update_task(self.task_id, status="paused")
                     self.log(f"Paused after [{stage.name}], waiting for manual continue")
@@ -124,7 +140,10 @@ class PipelineRunner:
                 current_stage="done",
                 final_video_path=str(_require(self.artifacts.final_video, "final_video")),
                 completed_at=database.now_iso(),
+                result_stale=0,
             )
+            if database.list_task_segments(self.task_id):
+                database.mark_segments_clean(self.task_id)
             self.log("Task succeeded")
         except Exception as exc:
             failure_traceback = traceback.format_exc()
@@ -500,22 +519,31 @@ class PipelineRunner:
             items = _json.loads(
                 self.artifacts.translation_file.read_text(encoding="utf-8")
             )["translation"]
+            from .review import import_translation_artifact
+
+            import_translation_artifact(self.task_id, self.artifacts.translation_file)
             self.stage_message(
                 "translate",
                 f"Reused uploaded translated SRT ({len(items)} cues); skipped OpenAI translation",
             )
             return
 
-        from .adapters.openai_translate import translate_asr
+        from .providers import get_translation_provider
+        from .review import provider_runtime
 
         asr_file = _require(self.artifacts.asr_fixed_file, "asr_fixed_file")
-        settings = database.get_openai_settings()
+        provider_name, settings = provider_runtime(task, "translation")
+        provider = get_translation_provider(provider_name)
         self.stage_message(
             "translate",
-            f"Using model {settings['model']} at {settings['base_url']} ({source.asr_language}->{source.target_language})",
+            f"Using {provider_name} model {settings.get('model') or '(default)'} "
+            f"({source.asr_language}->{source.target_language})",
         )
-        self.artifacts.translation_file = translate_asr(asr_file, session, settings, source)
+        self.artifacts.translation_file = provider.translate(asr_file, session, source, settings)
         items = _json.loads(self.artifacts.translation_file.read_text(encoding="utf-8"))["translation"]
+        from .review import import_translation_artifact
+
+        import_translation_artifact(self.task_id, self.artifacts.translation_file)
         self.stage_message(
             "translate",
             f"Translated {len(items)} sentences -> {self.artifacts.translation_file.name}",
@@ -536,18 +564,21 @@ class PipelineRunner:
         self.stage_message("split_audio", "Created vocal reference segments")
 
     def _tts(self, _: dict) -> None:
-        from .adapters.voxcpm import generate_tts
+        from .providers import get_tts_provider
+        from .review import provider_runtime
 
         session = _require(self.artifacts.session, "session")
         translation_file = _require(self.artifacts.translation_file, "translation_file")
         vocals_dir = _require(self.artifacts.vocals_dir, "vocals_dir")
         vocals_file = _require(self.artifacts.vocals_file, "vocals_file")
-        self.artifacts.tts_dir = generate_tts(
+        provider_name, settings = provider_runtime(database.get_task(self.task_id) or {}, "tts")
+        self.artifacts.tts_dir = get_tts_provider(provider_name).synthesize(
             translation_file,
             vocals_dir,
             session,
             progress_callback=lambda progress, message: self.stage_progress("tts", progress, message),
             original_vocals_file=vocals_file,
+            settings=settings,
         )
         wav_count = len(list(self.artifacts.tts_dir.glob("*.wav")))
         self.stage_message("tts", f"Generated {wav_count} TTS clips -> {self.artifacts.tts_dir}")

@@ -1,12 +1,13 @@
 from __future__ import annotations
 
 import logging
+import json
 import os
 import shutil
 import uuid
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal
 from urllib.parse import quote
 
 from fastapi import FastAPI, File, Form, HTTPException, Query, Request, Response, UploadFile
@@ -14,9 +15,9 @@ from fastapi.exception_handlers import request_validation_exception_handler
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 
-from . import auth, database, runtime_security, worker
+from . import auth, database, review, runtime_security, worker
 from .adapters.local_subtitles import parse_srt, uploaded_subtitle_dir
 from .adapters.local_video import remove_upload, uploaded_video_dir
 from .adapters.openai_client import validate_openai_base_url
@@ -38,7 +39,9 @@ MAX_LOCAL_SUBTITLE_BYTES = int(os.getenv("LOCAL_SUBTITLE_MAX_BYTES", str(20 * 10
 
 logger = logging.getLogger(__name__)
 
-TaskListStatus = Literal["all", "queued", "running", "paused", "succeeded", "failed"]
+TaskListStatus = Literal[
+    "all", "queued", "running", "awaiting_review", "paused", "succeeded", "failed"
+]
 TaskListExecutionMode = Literal["all", "auto", "manual"]
 TaskListSort = Literal[
     "created_desc",
@@ -64,6 +67,37 @@ class TaskCreate(BaseModel):
     url: str
     execution_mode: str = "auto"
     output_mode: str = "both"
+    review_mode: str = "none"
+    translation_profile_id: str | None = None
+    tts_profile_id: str | None = None
+
+
+class SegmentUpdate(BaseModel):
+    expected_revision: int
+    translated_text: str | None = None
+    start_ms: int | None = None
+    end_ms: int | None = None
+    speaker: str | None = None
+    audio_mode: Literal["tts", "original"] | None = None
+    tts_profile_id: str | None = None
+
+
+class ProviderProfileCreate(BaseModel):
+    kind: Literal["translation", "tts"]
+    name: str
+    provider: str
+    model: str = ""
+    config: dict[str, Any] = Field(default_factory=dict)
+    secrets: dict[str, Any] = Field(default_factory=dict)
+
+
+class ProviderProfileUpdate(BaseModel):
+    name: str | None = None
+    provider: str | None = None
+    model: str | None = None
+    config: dict[str, Any] | None = None
+    secrets: dict[str, Any] | None = None
+    clear_secrets: bool = False
 
 
 class ContinueTaskRequest(BaseModel):
@@ -129,12 +163,14 @@ async def lifespan(app: FastAPI):
     database.delete_expired_auth_sessions(database.now_iso())
     database.backfill_titles_from_metadata()
     database.fail_stale_active_tasks()
+    worker.register_handler("segment_preview", review.run_segment_preview)
+    worker.register_handler("dirty_render", review.run_dirty_render)
     worker.start(run_task)
     yield
 
 
 app = FastAPI(
-    title="YouDub API",
+    title="Dubloom API",
     lifespan=lifespan,
     docs_url=None,
     redoc_url=None,
@@ -329,6 +365,56 @@ def normalize_output_mode(value: str) -> str:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
+def normalize_review_mode(value: str) -> str:
+    try:
+        return database.normalize_review_mode(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+def _profile(profile_id: str | None, kind: str) -> dict[str, Any] | None:
+    if profile_id is None:
+        return None
+    profile = database.get_provider_profile(profile_id)
+    if profile is None:
+        raise HTTPException(status_code=422, detail=f"{kind.title()} profile not found.")
+    if profile["kind"] != kind:
+        raise HTTPException(status_code=422, detail=f"Profile {profile_id} is not a {kind} profile.")
+    return profile
+
+
+def _task_config_snapshot(
+    translation_profile_id: str | None,
+    tts_profile_id: str | None,
+) -> dict[str, Any]:
+    translation = _profile(translation_profile_id, "translation")
+    tts = _profile(tts_profile_id, "tts")
+    openai = database.get_openai_settings()
+    return {
+        "translation": (
+            {
+                "provider": translation["provider"],
+                "model": translation["model"],
+                "config": translation["config"],
+            }
+            if translation
+            else {
+                "provider": "openai-compatible",
+                "model": openai["model"],
+                "config": {
+                    "base_url": openai["base_url"],
+                    "translate_concurrency": openai["translate_concurrency"],
+                },
+            }
+        ),
+        "tts": (
+            {"provider": tts["provider"], "model": tts["model"], "config": tts["config"]}
+            if tts
+            else {"provider": "voxcpm2", "model": "OpenBMB/VoxCPM2", "config": {}}
+        ),
+    }
+
+
 @app.post("/api/tasks", status_code=201)
 def create_task(payload: TaskCreate) -> dict:
     try:
@@ -337,11 +423,30 @@ def create_task(payload: TaskCreate) -> dict:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
     normalized_execution_mode = normalize_execution_mode(payload.execution_mode)
     normalized_output_mode = normalize_output_mode(payload.output_mode)
-
-    existing_id = database.find_task_by_video_id(
-        validated_url.video_id,
-        normalized_output_mode,
+    normalized_review_mode = normalize_review_mode(payload.review_mode)
+    config_snapshot = _task_config_snapshot(
+        payload.translation_profile_id, payload.tts_profile_id
     )
+
+    if (
+        normalized_review_mode == database.DEFAULT_REVIEW_MODE
+        and payload.translation_profile_id is None
+        and payload.tts_profile_id is None
+    ):
+        # Keep the legacy two-argument call for backwards compatibility with
+        # integrations that wrap this helper.
+        existing_id = database.find_task_by_video_id(
+            validated_url.video_id,
+            normalized_output_mode,
+        )
+    else:
+        existing_id = database.find_task_by_video_id(
+            validated_url.video_id,
+            normalized_output_mode,
+            review_mode=normalized_review_mode,
+            translation_profile_id=payload.translation_profile_id,
+            tts_profile_id=payload.tts_profile_id,
+        )
     if existing_id:
         existing_task = database.get_task(existing_id)
         if existing_task is not None:
@@ -353,6 +458,10 @@ def create_task(payload: TaskCreate) -> dict:
         validated_url.video_id,
         execution_mode=normalized_execution_mode,
         output_mode=normalized_output_mode,
+        review_mode=normalized_review_mode,
+        translation_profile_id=payload.translation_profile_id,
+        tts_profile_id=payload.tts_profile_id,
+        config_snapshot=config_snapshot,
     )
     task = database.get_task(task_id)
     if task is None:
@@ -435,6 +544,9 @@ def upload_local_video(
     subtitle_file: UploadFile | None = File(None),
     execution_mode: str = Form("auto"),
     output_mode: str = Form("both"),
+    review_mode: str = Form("none"),
+    translation_profile_id: str | None = Form(None),
+    tts_profile_id: str | None = Form(None),
 ) -> dict:
     if direction not in LOCAL_UPLOAD_DIRECTIONS:
         raise HTTPException(status_code=422, detail="Unsupported local video direction.")
@@ -446,6 +558,8 @@ def upload_local_video(
         stored_subtitle_name = _clean_subtitle_filename(subtitle_file.filename)
     normalized_execution_mode = normalize_execution_mode(execution_mode)
     normalized_output_mode = normalize_output_mode(output_mode)
+    normalized_review_mode = normalize_review_mode(review_mode)
+    config_snapshot = _task_config_snapshot(translation_profile_id, tts_profile_id)
     _ensure_runtime_ready()
 
     task_id = str(uuid.uuid4())
@@ -472,6 +586,10 @@ def upload_local_video(
             task_id=task_id,
             execution_mode=normalized_execution_mode,
             output_mode=normalized_output_mode,
+            review_mode=normalized_review_mode,
+            translation_profile_id=translation_profile_id,
+            tts_profile_id=tts_profile_id,
+            config_snapshot=config_snapshot,
         )
         database.update_task(task_id, title=Path(original_name).stem)
         task = database.get_task(task_id)
@@ -514,6 +632,256 @@ def task_detail(task_id: str) -> dict:
     if not task:
         raise HTTPException(status_code=404, detail="Task not found.")
     return task
+
+
+@app.get("/api/tasks/{task_id}/segments")
+def task_segments(task_id: str) -> dict[str, Any]:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    try:
+        segments = review.segments_with_warnings(task_id)
+    except (ValueError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return {
+        "segments": segments,
+        "task": {
+            "id": task["id"],
+            "status": task["status"],
+            "review_mode": task.get("review_mode") or database.DEFAULT_REVIEW_MODE,
+            "review_approved_at": task.get("review_approved_at"),
+            "result_stale": bool(task.get("result_stale")),
+        },
+    }
+
+
+@app.patch("/api/tasks/{task_id}/segments/{segment_id}")
+def update_task_segment(task_id: str, segment_id: str, payload: SegmentUpdate) -> dict:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    if task["status"] in {"queued", "running"}:
+        raise HTTPException(status_code=409, detail="Cannot edit segments while the task is active.")
+    fields = payload.model_dump(exclude={"expected_revision"}, exclude_unset=True)
+    translated = fields.get("translated_text")
+    if translated is not None and not translated.strip():
+        raise HTTPException(status_code=422, detail="translated_text must be non-empty.")
+    speaker = fields.get("speaker")
+    if speaker is not None and not speaker.strip():
+        raise HTTPException(status_code=422, detail="speaker must be non-empty.")
+    if "tts_profile_id" in fields and fields["tts_profile_id"] is not None:
+        _profile(fields["tts_profile_id"], "tts")
+    try:
+        segment = database.update_task_segment(
+            task_id,
+            segment_id,
+            payload.expected_revision,
+            **fields,
+        )
+    except database.SegmentRevisionConflict as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if segment is None:
+        raise HTTPException(status_code=404, detail="Segment not found.")
+    if not task.get("final_video_path"):
+        database.update_task(task_id, result_stale=0)
+    return dict(segment, warnings=review.segment_warnings(segment))
+
+
+@app.post("/api/tasks/{task_id}/segments/{segment_id}/preview", status_code=202)
+def create_segment_preview(task_id: str, segment_id: str) -> dict:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    segment = database.get_task_segment(task_id, segment_id)
+    if segment is None:
+        raise HTTPException(status_code=404, detail="Segment not found.")
+    if task["status"] in {"queued", "running"}:
+        raise HTTPException(status_code=409, detail="Cannot preview while the task is active.")
+    if segment["audio_mode"] == "tts" and not str(segment["translated_text"]).strip():
+        raise HTTPException(status_code=422, detail="translated_text must be non-empty for TTS.")
+    database.set_segment_preview(task_id, segment_id, "queued")
+    job_id = worker.enqueue_job(
+        task_id,
+        "segment_preview",
+        {"segment_id": segment_id},
+    )
+    job = database.get_job(job_id)
+    if job is None:
+        raise RuntimeError(f"Job {job_id} was not persisted.")
+    return job
+
+
+@app.get("/api/tasks/{task_id}/segments/{segment_id}/audio")
+def segment_audio(
+    task_id: str,
+    segment_id: str,
+    kind: Literal["source", "preview"] = "source",
+) -> FileResponse:
+    try:
+        path = review.safe_segment_audio(task_id, segment_id, kind)
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except FileNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (PermissionError, RuntimeError) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    return FileResponse(path, media_type="audio/wav", headers={"Cache-Control": "no-store"})
+
+
+@app.post("/api/tasks/{task_id}/review/approve", status_code=202)
+def approve_task_review(task_id: str) -> dict:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    if task["status"] != "awaiting_review":
+        raise HTTPException(status_code=409, detail="Task is not awaiting review.")
+    try:
+        review.export_segments(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    _ensure_runtime_ready()
+    approved_at = database.now_iso()
+    database.update_task(
+        task_id,
+        status="queued",
+        current_stage="split_audio",
+        review_approved_at=approved_at,
+        result_stale=0,
+        error_message=None,
+        completed_at=None,
+    )
+    job_id = worker.enqueue_job(task_id, "pipeline")
+    result = database.get_task(task_id) or {}
+    result["job_id"] = job_id
+    return result
+
+
+@app.post("/api/tasks/{task_id}/render-dirty", status_code=202)
+def render_dirty_segments(task_id: str) -> dict:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    if task["status"] in {"queued", "running", "awaiting_review"}:
+        raise HTTPException(status_code=409, detail="Task is not ready for a dirty render.")
+    if not database.list_task_segments(task_id, dirty_only=True) and not task.get("result_stale"):
+        raise HTTPException(status_code=409, detail="No segment changes need rendering.")
+    try:
+        review.export_segments(task_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    _ensure_runtime_ready()
+    database.update_task(
+        task_id,
+        status="queued",
+        current_stage="tts" if task.get("output_mode") != "subtitles" else "merge_video",
+        error_message=None,
+        completed_at=None,
+    )
+    job_id = worker.enqueue_job(task_id, "dirty_render")
+    job = database.get_job(job_id)
+    if job is None:
+        raise RuntimeError(f"Job {job_id} was not persisted.")
+    return job
+
+
+@app.get("/api/tasks/{task_id}/artifact/source-video")
+def source_video(task_id: str) -> FileResponse:
+    task = database.get_task(task_id)
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found.")
+    session_path = str(task.get("session_path") or "").strip()
+    if not session_path:
+        raise HTTPException(status_code=404, detail="Source video is not available.")
+    session = Path(session_path).resolve()
+    path = (session / "media" / "video_source.mp4").resolve()
+    if not _is_inside_workfolder(session):
+        raise HTTPException(status_code=409, detail="Task session is outside the workfolder.")
+    try:
+        path.relative_to(session)
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail="Invalid source video path.") from exc
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail="Source video is not available.")
+    return FileResponse(path, media_type="video/mp4", headers={"Cache-Control": "no-store"})
+
+
+@app.get("/api/jobs/{job_id}")
+def job_detail(job_id: str) -> dict:
+    job = database.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found.")
+    return job
+
+
+def _validate_provider_name(kind: str, provider: str) -> None:
+    from .providers import get_translation_provider, get_tts_provider
+
+    try:
+        (get_translation_provider if kind == "translation" else get_tts_provider)(provider)
+    except KeyError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+@app.get("/api/provider-profiles")
+def provider_profiles(kind: Literal["translation", "tts"] | None = None) -> list[dict]:
+    return database.list_provider_profiles(kind)
+
+
+@app.post("/api/provider-profiles", status_code=201)
+def create_provider_profile(payload: ProviderProfileCreate) -> dict:
+    _validate_provider_name(payload.kind, payload.provider)
+    try:
+        profile_id = database.create_provider_profile(
+            payload.kind,
+            payload.name,
+            payload.provider,
+            payload.model,
+            payload.config,
+            payload.secrets,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    profile = database.get_provider_profile(profile_id)
+    assert profile is not None
+    return profile
+
+
+@app.get("/api/provider-profiles/{profile_id}")
+def provider_profile_detail(profile_id: str) -> dict:
+    profile = database.get_provider_profile(profile_id)
+    if profile is None:
+        raise HTTPException(status_code=404, detail="Provider profile not found.")
+    return profile
+
+
+@app.patch("/api/provider-profiles/{profile_id}")
+def update_provider_profile(profile_id: str, payload: ProviderProfileUpdate) -> dict:
+    current = database.get_provider_profile(profile_id)
+    if current is None:
+        raise HTTPException(status_code=404, detail="Provider profile not found.")
+    if payload.provider is not None:
+        _validate_provider_name(current["kind"], payload.provider)
+    try:
+        updated = database.update_provider_profile(
+            profile_id,
+            **payload.model_dump(exclude_unset=True),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    if not updated:
+        raise HTTPException(status_code=404, detail="Provider profile not found.")
+    profile = database.get_provider_profile(profile_id)
+    assert profile is not None
+    return profile
+
+
+@app.delete("/api/provider-profiles/{profile_id}", status_code=204)
+def delete_provider_profile(profile_id: str) -> Response:
+    if not database.delete_provider_profile(profile_id):
+        raise HTTPException(status_code=404, detail="Provider profile not found.")
+    return Response(status_code=204)
 
 
 def _is_inside_workfolder(path: Path) -> bool:
@@ -562,12 +930,23 @@ def rerun_task(task_id: str) -> dict:
     url = task["url"]
     execution_mode = task.get("execution_mode") or database.DEFAULT_EXECUTION_MODE
     output_mode = task.get("output_mode") or database.DEFAULT_OUTPUT_MODE
+    review_mode = task.get("review_mode") or database.DEFAULT_REVIEW_MODE
+    translation_profile_id = task.get("translation_profile_id")
+    tts_profile_id = task.get("tts_profile_id")
+    try:
+        config_snapshot = json.loads(task.get("config_snapshot") or "{}")
+    except (json.JSONDecodeError, TypeError):
+        config_snapshot = {}
     _purge_task(task)
     new_id = database.create_task(
         url,
         task_id=task_id,
         execution_mode=execution_mode,
         output_mode=output_mode,
+        review_mode=review_mode,
+        translation_profile_id=translation_profile_id,
+        tts_profile_id=tts_profile_id,
+        config_snapshot=config_snapshot,
     )
     worker.enqueue(new_id)
     return database.get_task(new_id)

@@ -1,73 +1,12 @@
-<p align="center">
-  <strong>Dubloom Studio · 织声</strong><br />
-  <em>逐句校准，让译制更像创作</em>
-</p>
-
 # Dubloom（织声）
-
-<p align="center">
-  <strong>面向本地创作者的译制校审工作台</strong>
-</p>
 
 Dubloom Studio 是一个面向个人创作者与小团队的本地视频译制工作台。
 
 它可以把单个 YouTube、Bilibili 或本地视频转换成目标语言版本：导入视频、识别并翻译内容，在逐句校审工作台中调整译文、时间码、说话人和发音配置，再按任务选择输出保留原音的硬字幕视频、无硬字幕的配音视频，或同时包含硬字幕与配音的视频。配音模式还会分离人声与背景音、生成配音并完成混音，最终视频可在网页中播放和下载。
 
-上游项目的核心成熟场景是 **YouTube 英文 -> 中文配音**；Dubloom Studio 保留该能力，同时支持 **Bilibili 中文 -> 英文配音** 和本地视频 **日文 -> 中文配音**。日译中方向已通过自动化参数链路和回归测试，尚未使用真实日语媒体完成模型效果验收。
-
-> **来源与独立性声明：** Dubloom Studio 是基于 [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui) 的独立二次开发版本，并非 YouDub-webui 原作者发布或背书的官方版本。上游原作者为 [刘朝 Zhao Liu](https://liuzhao1225.github.io/)（GitHub [@liuzhao1225](https://github.com/liuzhao1225)，Bilibili [黑纹白斑马](https://space.bilibili.com/1263732318)）。为兼容既有部署，代码中的 `YOUDUB_*` 环境变量、部分文件名和 API 路径暂不重命名。
+支持 **YouTube 英文 -> 中文**、**Bilibili 中文 -> 英文**，以及本地视频的 **英文 -> 中文**、**日文 -> 中文**、**中文 -> 英文** 三种翻译方向。日译中方向已通过自动化参数链路和回归测试，尚未使用真实日语媒体完成模型效果验收。
 
 English README: [README.en.md](README.en.md)
-
-## 上游验证过的创作者工作流
-
-**作者的 B 站频道**：[黑纹白斑马](https://space.bilibili.com/1263732318)（粉丝 100 万+，视频 2 万+，累计播放 6.8 亿+）的全站作品均使用 YouDub WebUI 自动翻译配音，覆盖科技、游戏、科普、动物、历史等题材。
-
-上述案例用于说明上游 YouDub-webui 已经验证的视频处理基础，不代表原作者参与或认可 Dubloom Studio 的改版。Dubloom 在这条本地化流水线之上增加了翻译后校审、逐句试听和局部重生成能力。
-
-## 效果示例
-
-下面两组样例来自上游 YouDub-webui，可以在 GitHub 页面直接播放。左侧是原视频，右侧是自动生成的配音版本；配音版包含目标语言语音和字幕，同时保留原视频的背景音乐与音效。
-
-### 1. Jensen Huang on Nvidia's Competition
-
-[原视频链接](https://www.youtube.com/shorts/TbotsRXyRME) · YouTube Shorts · 英文 -> 中文
-
-<table>
-<tr><th>原始英文</th><th>中文配音版</th></tr>
-<tr>
-<td>
-
-https://github.com/user-attachments/assets/befd11ca-e720-4faa-b4e0-d89bfe73df87
-
-</td>
-<td>
-
-https://github.com/user-attachments/assets/bf01f912-eec8-4e0d-8698-0f69283a73e7
-
-</td>
-</tr>
-</table>
-
-### 2. How much YT paid me for 129 million shorts views
-
-[原视频链接](https://www.youtube.com/watch?v=ii9Kh4XkA5g) · YouTube 横屏长视频 · 英文 -> 中文 · 下方为开头 40 秒切片，完整版可在 [`demo-assets`](https://github.com/liuzhao1225/YouDub-webui/releases/tag/demo-assets) Release 下载
-
-<table>
-<tr><th>原始英文</th><th>中文配音版</th></tr>
-<tr>
-<td>
-
-https://github.com/user-attachments/assets/bd02936f-cf3c-4e4b-85b5-0410d38f69f5
-
-</td>
-<td>
-
-https://github.com/user-attachments/assets/158de60a-7de4-4ddf-b3d8-478d0423aee6
-
-</td>
-</tr>
-</table>
 
 ## 快速开始
 
@@ -131,15 +70,15 @@ brew install ffmpeg node
 
 ### 2. 获取项目
 
-从当前 Dubloom Studio 仓库页面复制实际仓库地址，并在 Windows PowerShell、macOS 或 Linux 中执行：
+在 Windows PowerShell、macOS 或 Linux 中执行以下命令。当前仓库为私有仓库，克隆前需登录有访问权限的 GitHub 账号：
 
 ```powershell
-git clone 当前-Dubloom-仓库地址 Dubloom
-cd Dubloom
+git clone https://github.com/wind-far/dubloom.git
+cd dubloom
 git submodule update --init --recursive
 ```
 
-Demucs 以源码子模块引入，请不要跳过 `git submodule update`。如需核对原始实现或同步上游，请访问 [YouDub-webui 上游仓库](https://github.com/liuzhao1225/YouDub-webui)；该链接不是 Dubloom Studio 的发布地址。
+Demucs 以源码子模块引入，请不要跳过 `git submodule update`。
 
 ### 3. 安装依赖
 
@@ -266,7 +205,7 @@ macOS / Linux / WSL2：
 | `YTDLP_PROXY_PORT` | yt-dlp 使用的本机代理端口，例如 `7890`。 |
 | `HTTP_PROXY` / `ALL_PROXY` | 未在 UI 中设置代理端口时，yt-dlp 可读取 `HTTP_PROXY`；HTTPX/OpenAI SDK 也会读取这些环境代理。 |
 | `NO_PROXY` | 逗号分隔的代理绕过列表；使用本地 OpenAI 兼容服务时建议包含 `localhost,127.0.0.1,::1`，避免本地请求绕行系统代理。 |
-| `VOXCPM_MODEL` / `VOXCPM_MODEL_DIR` | VoxCPM2 的 ModelScope 模型名或本地模型目录；VoxCPM 当前由上游包内部选择 CUDA/MPS/CPU，任务日志会显示为 `voxcpm=library-auto`。 |
+| `VOXCPM_MODEL` / `VOXCPM_MODEL_DIR` | VoxCPM2 的 ModelScope 模型名或本地模型目录；VoxCPM 依赖库内部选择 CUDA/MPS/CPU，任务日志会显示为 `voxcpm=library-auto`。 |
 | `VOXCPM_LOAD_DENOISER` / `VOXCPM_CFG_VALUE` / `VOXCPM_INFERENCE_TIMESTEPS` / `VOXCPM_MIN_REFERENCE_MS` | VoxCPM2 推理参数。 |
 | `CORS_ALLOW_ORIGINS` / `CORS_ALLOW_ORIGIN_REGEX` | 显式允许的跨源前端来源；不能使用 `*`。同源 Next 代理不需要配置。 |
 
@@ -357,12 +296,11 @@ API key 和 Cookie 会在页面中脱敏显示，后端不会把 Cookie 明文�
 
 ### 导出 YouTube Cookie
 
-推荐使用 Chrome 扩展 [Get cookies.txt LOCALLY](https://chromewebstore.google.com/detail/get-cookiestxt-locally/cclelndahbckbenkjhflpdbgdldlbecc)（开源，Cookie 不出本机）：
+YouTube 下载可使用 Netscape 格式的 Cookie 文件：
 
-1. 在 Chrome 安装扩展并保持启用。
-2. 登录 `https://www.youtube.com`。
-3. 在 youtube.com 页面点击扩展图标，选择 `Export` -> `Netscape`，得到 `cookies.txt`。
-4. 把文件内容整段粘贴到 Settings 的 YouTube cookie 输入框。
+1. 在浏览器中登录自己的 YouTube 账号。
+2. 使用可信的本地工具导出该站点的 Cookie，保存为 Netscape 格式的 `cookies.txt`。
+3. 将文件内容粘贴到 Settings 的 YouTube cookie 输入框。Cookie 属于登录凭据，不要提交到仓库或分享给他人。
 
 请只处理你有权下载、转换和发布的视频内容。
 
@@ -385,10 +323,10 @@ YouTube / Bilibili URL
 
 本地视频上传使用同一条后半段流水线，支持英文或日文识别后翻译为中文，以及中文识别后翻译为英文。日译中方向会把 `ja` 传给 Whisper，并使用专用日译中提示词。若同时上传已翻译 `.srt` 字幕，系统会从 SRT 生成内部字幕时间轴，跳过 Whisper 与 OpenAI 翻译阶段，再按所选输出内容继续处理。v1 仅支持本地视频搭配 `.srt`，不支持 URL 任务附加字幕。
 
-## 功能亮点
+## 主要功能
 
-- **真实可用的端到端流程**：从 URL 到最终视频，不需要手动拆分音频、整理字幕或压制视频。
-- **双来源入口**：YouTube 英文 -> 中文是核心成熟场景；Bilibili 中文 -> 英文也已接入同一条任务流水线。
+- **端到端处理**：从 URL 到最终视频，不需要手动拆分音频、整理字幕或压制视频。
+- **视频输入**：支持 YouTube、Bilibili 链接和本地视频上传。
 - **三种输出模式**：可选择保留原音的硬字幕视频、无硬字幕的配音视频，或同时包含两者的视频。
 - **本地优先**：SQLite、Cookie、日志、中间产物和最终视频都保存在本机目录中。
 - **可观察任务进度**：任务历史、阶段状态、阶段耗时、运行日志和错误信息都可以在页面里查看。
@@ -448,7 +386,7 @@ submodule/demucs/  Demucs 源码子模块
 
 ## 项目状态与贡献
 
-Dubloom Studio 当前定位为本地创作者校审工作台：保留上游已经验证的串行视频处理能力，重点建设翻译后人工校审、逐句试听与局部重生成。项目仍处于 MVP 阶段，优先保持最短链路稳定和架构可读。
+Dubloom Studio 当前定位为本地创作者校审工作台，使用串行视频处理流水线，支持翻译后人工校审、逐句试听与局部重生成。项目仍处于 MVP 阶段，优先保持最短链路稳定和架构可读。
 
 欢迎贡献：
 
@@ -459,51 +397,8 @@ Dubloom Studio 当前定位为本地创作者校审工作台：保留上游已�
 - 增强任务管理、产物管理和失败恢复体验。
 - 补充不同平台的运行说明。
 
-如果这个项目对你有帮助，欢迎 Star、Fork、提交 Issue 或 PR，也欢迎分享给关注 AI 视频本地化、开源工具和跨语言内容传播的人。
-
-## 上游社区信息
-
-以下招聘与社区信息由 YouDub-webui 上游作者维护，不代表 Dubloom Studio 的维护团队或官方渠道。
-
-### 上游人才招聘
-
-银河智学是一家人工智能教育科技企业，致力于将大模型技术与探究式教学范式深度融合，构建面向 AGI 时代的创新学习体系。
-
-公司官网：[xiaoluxue.com](https://xiaoluxue.com/)
-
-我们正在北京海淀区中关村招聘以下岗位：
-
-- 全栈研发工程师
-- 高级 Go 后端架构师（内容平台 / 长任务编排 / AI Agent Runtime）
-
-薪资范围：**30–60K × 13 薪**。
-
-简历投递：[liuzhao@xiaoluxue.com](mailto:liuzhao@xiaoluxue.com)
-
-<p align="center">
-  <img src="apps/web/public/recruitment-poster-2026.jpg" alt="YouDub-webui 上游作者人才招聘海报：全栈研发工程师与高级 Go 后端架构师" width="680" />
-</p>
-
-### 上游社区交流
-
-YouDub-webui QQ 交流群：`618246010`
-
-<p align="center">
-  <img src="apps/web/public/qq-group-618246010.jpg" alt="YouDub-webui 上游 QQ 交流群二维码" width="220" />
-</p>
+问题反馈和功能建议请提交到[本仓库 Issues](https://github.com/wind-far/dubloom/issues)，代码贡献通过 Pull Request 提交。
 
 ## 开源许可
 
-Dubloom Studio 的修改内容继续使用 Apache License 2.0，详见 [LICENSE](LICENSE)。本项目派生自刘朝 Zhao Liu 创建的 [YouDub-webui](https://github.com/liuzhao1225/YouDub-webui)；再发布修改版时请保留许可证、原始版权与第三方模型许可说明。Dubloom Studio 是独立改版，不是上游原作者发布的官方版本。
-
-## 上游 Star History
-
-下图统计的是 YouDub-webui 上游仓库，不代表 Dubloom Studio 当前仓库的 Star 数量。
-
-<a href="https://www.star-history.com/?repos=liuzhao1225%2FYouDub-webui&type=date&legend=top-left">
- <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&theme=dark&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=liuzhao1225/YouDub-webui&type=date&legend=top-left&sealed_token=t9OTxsr7OPV9qT-QQDeYzphpOYSdcpyBno9hGLqvDQRBHhqogTh1auFAaWJaAaQQnFRCJ4eVCWm76U0W4uQAuak3r64RzoKrpjGYaNl2LetvfzQ4Y91giQ" />
- </picture>
-</a>
+本项目使用 Apache License 2.0，详见 [LICENSE](LICENSE)。第三方依赖与模型遵循各自的许可证。

@@ -1,10 +1,32 @@
-# Dubloom Studio
+<h1 align="center">🎙️ Dubloom · 织声</h1>
 
-A local video localization and dubbing review workspace for individual creators and small teams. Import a video, translate its subtitles, audition and edit each line, then render the voiceover and final video.
+<p align="center"><code>dubloom-studio</code></p>
 
-[简体中文](README.md) · **English**
+<h3 align="center">Turn a video into subtitles and voiceover you can refine line by line</h3>
 
-[Quick start](#quick-start) · [Usage](#usage) · [Configuration](#configuration) · [Report an issue](https://github.com/wind-far/dubloom/issues)
+<p align="center">Video import · Subtitle translation · Line-by-line review · Audio previews · Partial regeneration · Video export</p>
+
+<p align="center">A local AI video localization workspace for individual creators and small teams</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-007EC6?style=flat-square" alt="License: Apache 2.0" /></a>
+  <a href="#formats"><img src="https://img.shields.io/badge/Output-MP4-FF7F50?style=flat-square" alt="Output: MP4" /></a>
+  <a href="#usage"><img src="https://img.shields.io/badge/Review-line--by--line-8A2BE2?style=flat-square" alt="Review: line-by-line" /></a>
+  <a href="#capabilities"><img src="https://img.shields.io/badge/TTS-VoxCPM2-00A9D6?style=flat-square" alt="TTS: VoxCPM2" /></a>
+  <a href="#data"><img src="https://img.shields.io/badge/Storage-local_SQLite-20C55A?style=flat-square" alt="Storage: local SQLite" /></a>
+  <a href="#overview"><img src="https://img.shields.io/badge/Stage-MVP-E3A008?style=flat-square" alt="Stage: MVP" /></a>
+</p>
+
+<p align="center">
+  <a href="#capabilities">✨ Features</a> ·
+  <a href="#requirements">💻 Requirements</a> ·
+  <a href="#quick-start">🚀 Installation</a> ·
+  <a href="#usage">🎬 Usage</a> ·
+  <a href="#configuration">⚙️ Configuration</a> ·
+  <a href="https://github.com/wind-far/dubloom/issues">💬 Feedback</a>
+</p>
+
+<p align="center"><a href="README.md">简体中文</a> · <strong>English</strong></p>
 
 > [!NOTE]
 > This project is an MVP. It accepts YouTube, Bilibili, and local videos, and pauses for human review after translation by default. Japanese-to-Chinese has automated parameter-flow and regression coverage; model-quality acceptance with real Japanese media is still pending.

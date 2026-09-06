@@ -1,10 +1,32 @@
-# Dubloom · 织声
+<h1 align="center">🎙️ Dubloom · 织声</h1>
 
-面向个人创作者与小团队的本地视频译制校审工作台。导入视频、翻译字幕、逐句试听与修改，再生成配音和成片。
+<p align="center"><code>dubloom-studio</code></p>
 
-**简体中文** · [English](README.en.md)
+<h3 align="center">把一段视频，变成逐句可控的字幕与配音作品</h3>
 
-[快速开始](#quick-start) · [使用流程](#usage) · [配置说明](#configuration) · [反馈问题](https://github.com/wind-far/dubloom/issues)
+<p align="center">视频导入 · 字幕翻译 · 逐句校审 · 原声与配音试听 · 局部重生成 · 成片导出</p>
+
+<p align="center">一个面向个人创作者与小团队的本地 AI 视频译制工作台</p>
+
+<p align="center">
+  <a href="LICENSE"><img src="https://img.shields.io/badge/License-Apache_2.0-007EC6?style=flat-square" alt="License: Apache 2.0" /></a>
+  <a href="#formats"><img src="https://img.shields.io/badge/Output-MP4-FF7F50?style=flat-square" alt="Output: MP4" /></a>
+  <a href="#usage"><img src="https://img.shields.io/badge/Review-line--by--line-8A2BE2?style=flat-square" alt="Review: line-by-line" /></a>
+  <a href="#capabilities"><img src="https://img.shields.io/badge/TTS-VoxCPM2-00A9D6?style=flat-square" alt="TTS: VoxCPM2" /></a>
+  <a href="#data"><img src="https://img.shields.io/badge/Storage-local_SQLite-20C55A?style=flat-square" alt="Storage: local SQLite" /></a>
+  <a href="#overview"><img src="https://img.shields.io/badge/Stage-MVP-E3A008?style=flat-square" alt="Stage: MVP" /></a>
+</p>
+
+<p align="center">
+  <a href="#capabilities">✨ 特点</a> ·
+  <a href="#requirements">💻 运行要求</a> ·
+  <a href="#quick-start">🚀 安装</a> ·
+  <a href="#usage">🎬 使用流程</a> ·
+  <a href="#configuration">⚙️ 配置</a> ·
+  <a href="https://github.com/wind-far/dubloom/issues">💬 反馈</a>
+</p>
+
+<p align="center"><strong>简体中文</strong> · <a href="README.en.md">English</a></p>
 
 > [!NOTE]
 > 项目处于 MVP 阶段。支持 YouTube、Bilibili 和本地视频，默认在翻译完成后暂停，等待人工校审。日译中已有自动化参数链路与回归测试，真实日语媒体的模型效果仍待验收。
